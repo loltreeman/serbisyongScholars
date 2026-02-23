@@ -1,26 +1,21 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
-    <div className="App">
-
-        <div className="center-column">
-
-            <div className="item-row">
-              <span>One</span>
-            </div>
-
-            <div className="item-row">
-              <span>Two</span>
-            </div>
-
-            <div className="item-row">
-              <span>Three</span>
-            </div>
-
-        </div>
-    </div>
+    <Router>
+      <div className="App">
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
