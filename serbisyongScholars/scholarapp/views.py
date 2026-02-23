@@ -40,7 +40,38 @@ def register(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+# -- Send Verification Email -- #
+def send_confirmation_email(user):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    
+    #Point this to the React frontend route
+    frontend_url = f"http://localhost:3000/verify"
+    verification_link = f"{frontend_url}?uid={uid}&token={token}"
 
+    # Send the email
+    subject = "Confirm your serbisyonScholar Account"
+    message = f"""
+    Hi {user.first_name} {user.last_name},
+
+    Thank you for registering for an account on the Serbisyong Scholar Portal.
+
+    Please click the link below to verify your email address and activate your account:
+
+    {verification_link}
+
+    If you did not create this account, please disregard this email.
+
+    Thank you,
+    The Serbisyong Scholar Team
+    """
+    send_mail(
+        subject,
+        message,
+        settings.EMAIL_HOST_USER,
+        [user.email],
+        fail_silently=False,
+    )
 
 # -- Verify Email View -- #
 @api_view(['POST'])
@@ -60,6 +91,7 @@ def verify_email(request):
         return Response({'message': 'Email verified successfully.'}, status=status.HTTP_200_OK)
     else:
         return Response({'error': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST) 
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
