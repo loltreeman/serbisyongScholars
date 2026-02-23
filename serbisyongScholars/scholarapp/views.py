@@ -39,6 +39,24 @@ def register(request):
         return Response({'message': 'Registration successful. Please check your email to confirm your account.'}, status=status.HTTP_201_CREATED)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        
+
+
+
+# -- Verify Email View -- #
+@api_view(['POST'])
+def verify_email(request):
+    uidb64 = request.data.get('uid')
+    token = request.data.get('token')
+   
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except:
+        user = None
     
+    if user is not None and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+        return Response({'message': 'Email verified successfully.'}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST) 
