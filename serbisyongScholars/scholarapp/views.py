@@ -1,7 +1,6 @@
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.mail import send_mail
@@ -9,56 +8,21 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
-from django.shortcuts import render
+from .serializers import RegistrationSerializer
+
 User = get_user_model()
-
-
-def generate_unique_username(base_username):
-    normalized_base = ''.join((base_username or '').split()).lower()
-    if not normalized_base:
-        normalized_base = 'user'
-
-    candidate = normalized_base
-    suffix = 2
-
-    while User.objects.filter(username__iexact=candidate).exists():
-        candidate = f"{normalized_base}{suffix}"
-        suffix += 1
-
-    return candidate
 
 
 # Register a new user by default it is a scholar
 # -- SignUp View -- #
 @api_view(['POST'])
 def signup(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
-    first_name = request.data.get('first_name')
-    last_name = request.data.get('last_name')
-    
-    if not email.endswith('@student.ateneo.edu') and not email.endswith('@ateneo.edu'):
-        return Response({'error': 'Must use a valid Ateneo email.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        base_username = f"{first_name or ''}{last_name or ''}".strip() or (email.split('@')[0] if email else '')
-        username = generate_unique_username(base_username)
-
-        user = User.objects.create_user(
-            username=username,
-            email=email, 
-            password=password, 
-            first_name=first_name, 
-            last_name=last_name,
-            is_active=False
-        )
-        scholar_group, created = Group.objects.get_or_create(name='Scholar')
-        user.groups.add(scholar_group)
-
+    serializer = RegistrationSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
         send_confirmation_email(user)
         return Response({'message': 'Registration successful. Please check your email to confirm your account.'}, status=status.HTTP_201_CREATED)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # -- Send Verification Email -- #
 def send_confirmation_email(user):
@@ -133,7 +97,36 @@ def verify_email(request):
     
 #     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-# @api_view(['GET'])
+if not username:
+#         return Response({'error': 'Please provide a username in the URL'}, status=400)
+
+#     try:
+#         user = User.objects.get(username=username)
+#         scholar = user.scholar_profile
+#         service_logs = ServiceLog.objects.filter(scholar=scholar)
+        
+#         return Response({
+#             'student_id': scholar.student_id,
+#             'name': f"{user.first_name} {user.last_name}",
+#             'program': scholar.program_course,
+#             'is_dormer': scholar.is_dormer,
+#             'required_hours': scholar.required_hours,
+#             'rendered_hours': scholar.total_hours_rendered,
+#             'carry_over': scholar.carry_over_hours,
+#             'service_logs': [
+#                 {
+#                     'date': log.date_rendered,
+#                     'hours': log.hours,
+#                     'office': log.office_name,
+#                     'activity': log.activity_description
+#                 }
+#                 for log in service_logs
+#             ]
+#         })
+#     except User.DoesNotExist:
+#         return Response({'error': 'User not found'}, status=404)
+#     except ScholarProfile.DoesNotExist:
+#         return Response({'error': 'Scholar profile not found for this user'}, status=404)# @api_view(['GET'])
 # @permission_classes([AllowAny]) # Changed to AllowAny
 # def get_scholar_dashboard(request):
 #     # Because there is no authentication, Django doesn't know who "request.user" is.
