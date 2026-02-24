@@ -10,12 +10,27 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.shortcuts import render
-
 User = get_user_model()
+
+
+def generate_unique_username(base_username):
+    normalized_base = ''.join((base_username or '').split()).lower()
+    if not normalized_base:
+        normalized_base = 'user'
+
+    candidate = normalized_base
+    suffix = 2
+
+    while User.objects.filter(username__iexact=candidate).exists():
+        candidate = f"{normalized_base}{suffix}"
+        suffix += 1
+
+    return candidate
+
+
 # Register a new user by default it is a scholar
 # -- SignUp View -- #
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def signup(request):
     email = request.data.get('email')
     password = request.data.get('password')
@@ -26,8 +41,11 @@ def signup(request):
         return Response({'error': 'Must use a valid Ateneo email.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        base_username = f"{first_name or ''}{last_name or ''}".strip() or (email.split('@')[0] if email else '')
+        username = generate_unique_username(base_username)
+
         user = User.objects.create_user(
-            username=first_name + last_name,
+            username=username,
             email=email, 
             password=password, 
             first_name=first_name, 
