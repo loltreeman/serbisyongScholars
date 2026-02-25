@@ -81,6 +81,7 @@ class SignUpSerializer(serializers.ModelSerializer):
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             role='SCHOLAR',
+            is_active=False,
             is_email_verified=False
         )
         

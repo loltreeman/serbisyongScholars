@@ -1,3 +1,4 @@
+import threading
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import api_view
@@ -25,7 +26,10 @@ def signup(request):
     serializer = RegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
-        send_confirmation_email(user)
+        # Send email in background so the response is instant
+        thread = threading.Thread(target=send_confirmation_email, args=(user,))
+        thread.daemon = True
+        thread.start()
         return Response({'message': 'Registration successful. Please check your email to confirm your account.'}, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -75,6 +79,7 @@ def verify_email(request):
     
     if user is not None and default_token_generator.check_token(user, token):
         user.is_active = True
+        user.is_email_verified = True
         user.save()
         return Response({'message': 'Email verified successfully.'}, status=status.HTTP_200_OK)
     else:

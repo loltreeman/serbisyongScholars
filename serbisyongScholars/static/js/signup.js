@@ -1,9 +1,15 @@
 const form = document.getElementById("signupForm");
 const errorBox = document.getElementById("error");
+const submitBtn = form.querySelector("button[type='submit']");
 
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
     errorBox.classList.add("hidden");
+
+    // Prevent duplicate submissions by disabling the button immediately
+    submitBtn.disabled = true;
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = "Creating account...";
 
     const payload = {
         username: document.getElementById("username").value,
@@ -31,15 +37,18 @@ form.addEventListener("submit", async (e) => {
                 "Signup failed";
             errorBox.textContent = errorMsg;
             errorBox.classList.remove("hidden");
+            // Re-enable button so the user can fix their input and retry
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
             return;
         }
 
-        alert(
-            "Account created! Please check your email to verify your account."
-        );
+        alert("Account created! Please check your email to verify your account.");
         window.location.href = "/login/";
     } catch (err) {
         errorBox.textContent = "Connection error. Please try again.";
         errorBox.classList.remove("hidden");
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
     }
 });
