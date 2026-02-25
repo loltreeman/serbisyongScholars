@@ -33,8 +33,7 @@ def signup(request):
 def send_confirmation_email(user):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    
-    #Point this to the React frontend route
+
     frontend_url = f"http://localhost:3000/verify"
     verification_link = f"{frontend_url}?uid={uid}&token={token}"
 
