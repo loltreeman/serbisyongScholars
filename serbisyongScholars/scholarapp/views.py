@@ -9,6 +9,9 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from .serializers import RegistrationSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .models import ScholarProfile, ServiceLog
 
 User = get_user_model()
 
@@ -75,6 +78,61 @@ def verify_email(request):
         return Response({'message': 'Email verified successfully.'}, status=status.HTTP_200_OK)
     else:
         return Response({'error': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST) 
+# Custom Token serializer/view to include user data in token response
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        data['user'] = {
+            'username': self.user.username,
+            'email': self.user.email,
+            'first_name': getattr(self.user, 'first_name', ''),
+            'last_name': getattr(self.user, 'last_name', ''),
+            'is_active': self.user.is_active,
+        }
+
+        return data
+
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
+
+
+# -- Scholar Dashboard View -- #
+@api_view(['GET'])
+def get_scholar_dashboard(request):
+    username = request.GET.get('username')
+
+    if not username:
+        return Response({'error': 'Please provide a username in the URL'}, status=400)
+
+    try:
+        user = User.objects.get(username=username)
+        scholar = user.scholar_profile
+        service_logs = ServiceLog.objects.filter(scholar=scholar)
+
+        return Response({
+            'student_id': scholar.student_id,
+            'name': f"{user.first_name} {user.last_name}",
+            'program': scholar.program_course,
+            'is_dormer': scholar.is_dormer,
+            'required_hours': scholar.required_hours,
+            'rendered_hours': scholar.total_hours_rendered,
+            'carry_over': scholar.carry_over_hours,
+            'service_logs': [
+                {
+                    'date': log.date_rendered,
+                    'hours': log.hours,
+                    'office': log.office_name,
+                    'activity': log.activity_description
+                }
+                for log in service_logs
+            ]
+        })
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+    except ScholarProfile.DoesNotExist:
+        return Response({'error': 'Scholar profile not found for this user'}, status=404)
 
 
 # @api_view(['POST'])
@@ -97,7 +155,7 @@ def verify_email(request):
     
 #     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-if not username:
+# if not username:
 #         return Response({'error': 'Please provide a username in the URL'}, status=400)
 
 #     try:
