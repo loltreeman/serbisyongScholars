@@ -23,6 +23,7 @@ urlpatterns = [
     path('login/', TemplateView.as_view(template_name='login.html'), name='login'),
     path('signup/', TemplateView.as_view(template_name='signup.html'), name='signup'),
     path('dashboard/', TemplateView.as_view(template_name='dashboard.html'), name='dashboard'),
+    path('verify/', TemplateView.as_view(template_name='verify.html'), name='verify'),
     path('api/', include('scholarapp.urls')),
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
 ]

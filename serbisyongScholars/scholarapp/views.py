@@ -34,7 +34,7 @@ def send_confirmation_email(user):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
 
-    frontend_url = f"http://localhost:3000/verify"
+    frontend_url = f"{settings.SITE_URL}/verify"
     verification_link = f"{frontend_url}?uid={uid}&token={token}"
 
     # Send the email

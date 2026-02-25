@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email - Serbisyong Scholar</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/verify.css' %}">
+</head>
+<body>
+    <div class="verify-container">
+        <div class="verify-card" id="verifyCard">
+            <div class="spinner" id="spinner"></div>
+            <h1 id="statusTitle">Verifying your email...</h1>
+            <p id="statusMessage">Please wait while we activate your account.</p>
+            <a href="/login/" class="btn-login hidden" id="loginBtn">Go to Login</a>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const uid = params.get('uid');
+        const token = params.get('token');
+
+        const title = document.getElementById('statusTitle');
+        const message = document.getElementById('statusMessage');
+        const spinner = document.getElementById('spinner');
+        const loginBtn = document.getElementById('loginBtn');
+
+        async function verifyEmail() {
+            if (!uid || !token) {
+                spinner.classList.add('hidden');
+                title.textContent = 'Invalid Link';
+                message.textContent = 'This verification link is missing required parameters. Please request a new one.';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/verify/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid, token }),
+                });
+
+                const data = await res.json();
+                spinner.classList.add('hidden');
+
+                if (res.ok) {
+                    title.textContent = '✅ Email Verified!';
+                    message.textContent = 'Your account has been activated. You can now log in.';
+                    loginBtn.classList.remove('hidden');
+                } else {
+                    title.textContent = '❌ Verification Failed';
+                    message.textContent = data.error || 'This link is invalid or has already been used. Please register again.';
+                }
+            } catch (err) {
+                spinner.classList.add('hidden');
+                title.textContent = 'Connection Error';
+                message.textContent = 'Could not reach the server. Please try again later.';
+            }
+        }
+
+        verifyEmail();
+    </script>
+</body>
+</html>
