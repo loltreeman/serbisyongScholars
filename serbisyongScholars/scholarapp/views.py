@@ -12,6 +12,8 @@ from .serializers import RegistrationSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import ScholarProfile, ServiceLog
+from django.http import JsonResponse
+from .models import Announcement
 
 User = get_user_model()
 
@@ -134,6 +136,18 @@ def get_scholar_dashboard(request):
     except ScholarProfile.DoesNotExist:
         return Response({'error': 'Scholar profile not found for this user'}, status=404)
 
+def get_recent_announcements(request):
+    # Get 2 latest announcements
+    announcements = Announcement.objects.all().order_by('-created_at')[:2]
+    data = [{
+        "id": a.id,
+        "title": a.title,
+        "content": a.content[:100], # Snippet
+        "tag_name": a.category,     # e.g., "Urgent"
+        "tag_color": "red" if a.category == "Urgent" else "amber"
+    } for a in announcements]
+    
+    return JsonResponse(data, safe=False)
 
 # @api_view(['POST'])
 # @permission_classes([AllowAny])

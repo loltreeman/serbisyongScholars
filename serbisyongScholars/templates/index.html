@@ -1,0 +1,391 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>serbisyongScholar - OAA Service Hour Tracking Portal</title>
+    <link rel="stylesheet" href="{% static 'css/index.css' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900">
+    
+    <!-- Navigation Bar -->
+    <nav class="bg-white/10 backdrop-blur-md border-b border-white/20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <!-- Logo -->
+                    <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                        <span class="text-blue-900 font-bold text-xl">S</span>
+                    </div>
+                    <span class="text-white text-xl font-bold">serbisyongScholar</span>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="#features" class="text-white/90 hover:text-white transition">Features</a>
+                    <a href="#about" class="text-white/90 hover:text-white transition">About</a>
+                    <a href="#contact" class="text-white/90 hover:text-white transition">Contact</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
+        <div class="text-center animate-fade-in">
+            <!-- Badge -->
+            <div class="inline-block mb-6">
+                <span class="bg-yellow-400 text-blue-900 px-4 py-2 rounded-full text-sm font-semibold">
+                    OAA Service Hour Tracking Portal
+                </span>
+            </div>
+
+            <!-- Main Heading -->
+            <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+                Track Your Service Hours
+                <br />
+                <span class="text-yellow-400">Securely & Efficiently</span>
+            </h1>
+
+            <!-- Subheading -->
+            <p class="text-xl md:text-2xl text-white/80 mb-8 max-w-3xl mx-auto">
+                A centralized hub for Ateneo Financial Aid scholars to manage service hours, 
+                discover opportunities, and stay connected with the OAA.
+            </p>
+
+            <!-- CTA Buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <a href="{% url 'login' %}" class="px-8 py-4 bg-yellow-400 hover:bg-yellow-300 text-blue-900 rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-all duration-200">
+                    Get Started →
+                </a>
+                <a href="#about" class="px-8 py-4 bg-white/10 hover:bg-white/20 text-white rounded-lg font-semibold text-lg backdrop-blur-sm border border-white/30 transition-all duration-200">
+                    Learn More
+                </a>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-8 max-w-2xl mx-auto mt-16">
+                <div class="text-center">
+                    <div class="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">100%</div>
+                    <div class="text-white/70 text-sm">Secure</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">24/7</div>
+                    <div class="text-white/70 text-sm">Access</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">Real-time</div>
+                    <div class="text-white/70 text-sm">Updates</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div id="features" class="bg-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Everything You Need in One Place
+                </h2>
+                <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                    Replacing the insecure Google Spreadsheet with a professional, privacy-focused platform
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="bg-gradient-to-br from-blue-50 to-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-blue-100">
+                    <div class="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-3">Service Hour Tracker</h3>
+                    <p class="text-gray-600 mb-4">
+                        View your rendered hours, required hours, and carry-over balance in real-time with visual progress indicators.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Real-time progress bar
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Dormer/Non-dormer tracking
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Semester carry-over
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="bg-gradient-to-br from-yellow-50 to-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-yellow-100">
+                    <div class="w-14 h-14 bg-yellow-500 rounded-xl flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-3">Secure & Private</h3>
+                    <p class="text-gray-600 mb-4">
+                        No more public spreadsheets. Your student ID and service history are protected with enterprise-grade security.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Ateneo SSO integration
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Email verification
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Role-based access control
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="bg-gradient-to-br from-green-50 to-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow border border-green-100">
+                    <div class="w-14 h-14 bg-green-600 rounded-xl flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-3">Announcements & Opportunities</h3>
+                    <p class="text-gray-600 mb-4">
+                        Stay updated with volunteer opportunities, food stubs, and urgent announcements from the OAA and partner offices.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Urgent notifications
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Food stub sign-ups
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span> Event opportunities
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works Section -->
+    <div class="bg-gray-50 py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    How It Works
+                </h2>
+                <p class="text-xl text-gray-600">
+                    Get started in three simple steps
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Step 1 -->
+                <div class="relative">
+                    <div class="bg-white p-8 rounded-2xl shadow-md text-center">
+                        <div class="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">
+                            1
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-3">Sign Up</h3>
+                        <p class="text-gray-600">
+                            Create your account using your Ateneo email. Admin accounts are managed by OAA.
+                        </p>
+                    </div>
+                    <!-- Arrow for desktop -->
+                    <div class="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                        <svg class="w-8 h-8 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="relative">
+                    <div class="bg-white p-8 rounded-2xl shadow-md text-center">
+                        <div class="w-16 h-16 bg-yellow-500 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">
+                            2
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-3">Verify Email</h3>
+                        <p class="text-gray-600">
+                            Check your inbox for a confirmation link to verify your email address.
+                        </p>
+                    </div>
+                    <!-- Arrow for desktop -->
+                    <div class="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                        <svg class="w-8 h-8 text-yellow-300" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="bg-white p-8 rounded-2xl shadow-md text-center">
+                    <div class="w-16 h-16 bg-green-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">
+                        3
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Start Tracking</h3>
+                    <p class="text-gray-600">
+                        Access your dashboard to view service hours, apply for vouchers, and stay updated.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <div id="about" class="bg-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h2 class="text-4xl font-bold text-gray-900 mb-6">
+                        Why serbisyongScholar?
+                    </h2>
+                    <p class="text-lg text-gray-600 mb-6">
+                        Following the shutdown of the legacy service hour website, scholars relied on a public Google Spreadsheet 
+                        that exposed student IDs and service history to everyone. serbisyongScholar solves this critical privacy 
+                        issue while providing a better experience for everyone.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-3 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Data Privacy First</h4>
+                                <p class="text-gray-600">No more public spreadsheets exposing sensitive information</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-3 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Centralized Hub</h4>
+                                <p class="text-gray-600">Everything in one place - no more scattered updates</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-3 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Mobile-Friendly</h4>
+                                <p class="text-gray-600">Check your hours anytime, anywhere on any device</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-blue-100 to-blue-50 p-8 rounded-2xl">
+                    <div class="bg-white rounded-xl shadow-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="font-bold text-gray-900">Service Hour Progress</h4>
+                            <span class="text-sm text-green-600 font-semibold">80% Complete</span>
+                        </div>
+                        <div class="w-full h-4 bg-gray-200 rounded-full overflow-hidden mb-4">
+                            <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400" style="width: 80%"></div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <div class="text-2xl font-bold text-blue-600">12</div>
+                                <div class="text-xs text-gray-600">Rendered</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-gray-900">15</div>
+                                <div class="text-xs text-gray-600">Required</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-green-600">0</div>
+                                <div class="text-xs text-gray-600">Carry-over</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA Section -->
+    <div class="bg-gradient-to-r from-yellow-400 to-yellow-500 py-16">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl font-bold text-blue-900 mb-4">
+                Ready to Get Started?
+            </h2>
+            <p class="text-xl text-blue-900/80 mb-8">
+                Join the serbisyongScholar community today and take control of your service hours.
+            </p>
+            <a href="{% url 'signup' %}" class="inline-block px-10 py-4 bg-blue-900 hover:bg-blue-800 text-white rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-all duration-200">
+                Sign Up Now →
+            </a>
+        </div>
+    </div>
+
+    <footer id="contact" class="bg-[#001d3d] py-12 border-t border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-8 h-8 bg-[#fbbf24] rounded-full flex items-center justify-center font-bold text-[#001d3d]">S</div>
+                        <h3 class="text-white font-bold text-lg">serbisyongScholar</h3>
+                    </div>
+                    <p class="text-white/70 text-sm leading-relaxed">
+                        The official Service Hour Tracking Portal for Ateneo de Manila University Financial Aid Scholars. 
+                        Streamlining volunteer work and scholarship maintenance for the Loyola Schools community.
+                    </p>
+                </div>
+
+                <div>
+                    <h3 class="text-white font-bold text-lg mb-4 text-amber-400">Contact OAA</h3>
+                    <ul class="space-y-3 text-white/70 text-sm">
+                        <li class="flex items-start gap-3">
+                            <span>📧</span>
+                            <a href="mailto:scholarships.as@ateneo.edu" class="hover:text-white transition">scholarships.as@ateneo.edu</a>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span>📞</span>
+                            <div>
+                                <p>+63 (2) 8426-6001</p>
+                                <p class="text-xs text-white/50">Local 5154 / 5155</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span>📍</span>
+                            <div>
+                                <p class="font-semibold text-white">Ground Floor, Kostka Hall</p>
+                                <p>Ateneo de Manila University</p>
+                                <p>Katipunan Ave, Quezon City, 1108</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="border-t border-white/10 pt-8">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
+                    <div>
+                        <p class="text-white/60 text-xs uppercase tracking-widest font-semibold">
+                            © 2026 serbisyongScholar
+                        </p>
+                        <p class="text-white/40 text-[10px] mt-1">
+                            Developed by <span class="text-white/60">Summa Coders</span> for CSCI 42 • Ateneo de Manila University
+                        </p>
+                    </div>
+                    <div class="flex gap-4">
+                        <img src="https://www.ateneo.edu/sites/default/files/ateneo-logo-blue.png" alt="ADMU Logo" class="h-8 opacity-50 grayscale hover:grayscale-0 transition duration-300">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/index.js' %}"></script>
+</body>
+</html>

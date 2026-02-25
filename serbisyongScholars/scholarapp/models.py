@@ -45,3 +45,30 @@ class ServiceLog(models.Model):
     
     def __str__(self):
         return f"{self.scholar.student_id} - {self.hours}hrs"
+class Announcement(models.Model):
+    CATEGORY_CHOICES = [
+        ('GENERAL', 'General'),
+        ('URGENT', 'Urgent'),
+        ('VOLUNTEER', 'Volunteer Work'),
+        ('OPPORTUNITY', 'Scholarship Opportunity'),
+    ]
+
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='GENERAL')
+    
+    # Who posted it (usually an Admin or Moderator)
+    author = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role__in': ['ADMIN', 'MODERATOR']})
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Optional: Link to an external form or PDF
+    external_link = models.URLField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at'] # Latest announcements first
+
+    def __str__(self):
+        return f"[{self.category}] {self.title}"
