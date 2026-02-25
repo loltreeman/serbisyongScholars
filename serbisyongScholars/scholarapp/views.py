@@ -97,7 +97,7 @@ def verify_email(request):
     
 #     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-if not username:
+# if not username:
 #         return Response({'error': 'Please provide a username in the URL'}, status=400)
 
 #     try:
