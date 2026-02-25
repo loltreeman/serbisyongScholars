@@ -52,7 +52,6 @@ function Dashboard() {
     <div className="min-h-screen bg-[#0a0a0a] font-mono text-white">
       <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none" />
 
-      {/* Header */}
       <header className="relative z-10 border-b border-neutral-900 px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-base font-bold tracking-tight text-white">
@@ -69,7 +68,6 @@ function Dashboard() {
 
       <main className="relative z-10 max-w-3xl mx-auto px-6 py-10 space-y-6">
 
-        {/* Welcome + Meta */}
         <div>
           <p className="text-[10px] tracking-[0.3em] text-neutral-600 uppercase mb-1">Dashboard</p>
           <h2 className="text-2xl font-bold text-white">Welcome back, {data.name}.</h2>
@@ -78,7 +76,6 @@ function Dashboard() {
           </p>
         </div>
 
-        {/* Progress card */}
         <div className="border border-neutral-800 rounded-lg p-6 bg-neutral-950/60">
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -95,7 +92,6 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${isComplete ? 'bg-blue-400' : 'bg-blue-500'}`}
@@ -123,7 +119,6 @@ function Dashboard() {
           ))}
         </div>
 
-        {/* Service logs */}
         <div>
           <div className="flex items-center gap-3 mb-3">
             <p className="text-[10px] tracking-[0.25em] text-neutral-600 uppercase">Service Hours History</p>

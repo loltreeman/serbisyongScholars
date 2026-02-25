@@ -34,11 +34,9 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4 font-mono">
-      {/* Subtle grid background */}
       <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none" />
 
       <div className="w-full max-w-sm relative z-10">
-        {/* Brand */}
         <div className="mb-10">
           <p className="text-[10px] tracking-[0.3em] text-neutral-600 uppercase mb-2">Ateneo de Manila</p>
           <h1 className="text-2xl font-bold text-white tracking-tight">serbisyong<span className="text-blue-400">Scholar</span></h1>
