@@ -37,7 +37,7 @@ form.addEventListener("submit", async (e) => {
         alert(
             "Account created! Please check your email to verify your account."
         );
-        window.location.href = "/login";
+        window.location.href = "/login/";
     } catch (err) {
         errorBox.textContent = "Connection error. Please try again.";
         errorBox.classList.remove("hidden");
