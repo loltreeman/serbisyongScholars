@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Sum
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 
@@ -45,6 +46,22 @@ class ServiceLog(models.Model):
     
     def __str__(self):
         return f"{self.scholar.student_id} - {self.hours}hrs"
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # added logs should update total_hours_rendered by the scholar
+        total = ServiceLog.objects.filter(scholar=self.scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+        self.scholar.total_hours_rendered = total
+        self.scholar.save()
+
+    def delete(self, *args, **kwargs):
+        scholar = self.scholar
+        super().delete(*args, **kwargs)
+        # deleted logs should update total_hours_rendered by the scholar
+        total = ServiceLog.objects.filter(scholar=scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+        scholar.total_hours_rendered = total
+        scholar.save()
+
 class Announcement(models.Model):
     CATEGORY_CHOICES = [
         ('GENERAL', 'General'),
