@@ -25,7 +25,7 @@
 - [Environment Variables](#environment-variables)
 - [Running the Application](#running-the-application)
 - [API Documentation](#api-documentation)
-- [Usage Instructions](#usage-instructions)
+- [Usage Instructions](#how-to-use-serbisyongscholar)
 - [Project Structure](#project-structure)
 - [Contributors](#contributors)
 - [License](#license)
