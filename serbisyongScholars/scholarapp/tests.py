@@ -1,3 +1,4 @@
+from datetime import date
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -30,23 +31,21 @@ class IterationOneTests(APITestCase):
             required_hours=15.0
         )
         
-        # We'll add a dummy service log to ensure the dashboard accurately pulls and formats history data.
         ServiceLog.objects.create(
             scholar=self.scholar_profile,
-            date_rendered='2024-03-01',
+            date_rendered=date(2024, 3, 1),
             hours=2.5,
             office_name='OAA',
             activity_description='Filing documents'
         )
 
-        # Storing the API endpoints here keeps the test functions clean and easy to read.
         self.signup_url = reverse('api_signup')
         self.login_url = reverse('api_token_obtain_pair')
         self.dashboard_url = reverse('api_dashboard')
 
-    # mock the email function 
-    @patch('scholarapp.views.send_confirmation_email')
-    def test_scholar_signup_success(self, mock_send_email):
+    # Mock threading.Thread entirely to prevent background processes from crashing the test database
+    @patch('scholarapp.views.threading.Thread')
+    def test_scholar_signup_success(self, mock_thread):
         """Ensures a new scholar can register and both their User and ScholarProfile records are created properly."""
         data = {
             "username": "mclara",
@@ -105,7 +104,6 @@ class IterationOneTests(APITestCase):
     def test_dashboard_authorized_access(self):
         """Verifies that a properly authenticated user receives their specific dashboard data and logs."""
         
-        # We need to grab a fresh token by logging in first, simulating a real frontend flow.
         login_response = self.client.post(self.login_url, {
             "username": "jdelacruz",
             "password": "strongpassword123"
