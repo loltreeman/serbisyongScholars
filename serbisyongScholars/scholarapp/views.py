@@ -42,7 +42,7 @@ def send_confirmation_email(user):
     verification_link = f"{frontend_url}?uid={uid}&token={token}"
 
     # Send the email
-    subject = "Confirm your serbisyonScholar Account"
+    subject = "Confirm your serbisyongScholar Account"
     message = f"""
     Hi {user.first_name} {user.last_name},
 
