@@ -9,6 +9,9 @@ User = get_user_model()
 
 class AdminDashboardTests(TestCase):
     """Tests for Admin Dashboard page"""
+    
+    def setUp(self):  # ← YOU'RE MISSING THIS LINE!
+        """Create test data"""
         # Create admin user
         self.admin = User.objects.create_user(
             username='testadmin',
@@ -95,7 +98,8 @@ class AdminDashboardTests(TestCase):
         self.client.force_login(self.admin)
         
         # Filter for complete scholars
-        response = self.client.get('/admin/scholars/?status=complete')
+        url = reverse('admin_scholars_list')
+        response = self.client.get(url, {'status': 'complete'})
         
         # Check if response is JSON
         if response.status_code == 200:
@@ -110,7 +114,8 @@ class AdminDashboardTests(TestCase):
         """Test if search by student ID works"""
         self.client.force_login(self.admin)
         
-        response = self.client.get('/admin/scholars/?search=123450')
+        url = reverse('admin_scholars_list')
+        response = self.client.get(url, {'search': '123450'})
         
         # Check if response is JSON
         if response.status_code == 200:
@@ -123,7 +128,8 @@ class AdminDashboardTests(TestCase):
     def test_admin_dashboard_requires_auth(self):
         """Test if dashboard requires authentication"""
         # Try to access without login
-        response = self.client.get('/admin/dashboard/')
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
         
         # Should redirect to login (302)
         self.assertEqual(response.status_code, 302)
@@ -139,3 +145,126 @@ class AdminDashboardTests(TestCase):
         
         # Should be forbidden (403)
         self.assertEqual(response.status_code, 403)
+
+class ProgressVisualizationTests(TestCase):
+    """Tests for progress bar components"""
+    
+    def setUp(self):
+        """Create test data"""
+        user = User.objects.create_user(
+            username='testscholar',
+            email='test@student.ateneo.edu',
+            password='TestPass123!',
+            role='SCHOLAR',
+            first_name='Test',
+            last_name='Scholar',
+            is_email_verified=True
+        )
+        
+        self.profile = ScholarProfile.objects.create(
+            user=user,
+            student_id='123456',
+            program_course='BS CS',
+            scholar_grant='FULL',
+            is_dormer=False,
+            required_hours=15.0
+        )
+        
+        self.client = APIClient()
+    
+    def test_progress_calculation_80_percent(self):
+        """Test if progress calculates 80% correctly"""
+        # Add 12 hours (80% of 15)
+        ServiceLog.objects.create(
+            scholar=self.profile,
+            date_rendered=date(2026, 2, 15),
+            hours=12.0,
+            office_name='Library',
+            activity_description='Test'
+        )
+        
+        # Update total
+        self.profile.total_hours_rendered = 12.0
+        self.profile.save()
+        
+        # Calculate percentage
+        percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
+        self.assertEqual(percentage, 80.0)
+    
+    def test_progress_calculation_complete(self):
+        """Test if progress shows 100% when complete"""
+        # Add 15 hours (100% of 15)
+        ServiceLog.objects.create(
+            scholar=self.profile,
+            date_rendered=date(2026, 2, 15),
+            hours=15.0,
+            office_name='Library',
+            activity_description='Test'
+        )
+        
+        # Update total
+        self.profile.total_hours_rendered = 15.0
+        self.profile.save()
+        
+        # Calculate percentage
+        percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
+        self.assertEqual(percentage, 100.0)
+    
+    def test_progress_bar_handles_overflow(self):
+        """Test if system handles hours over 100%"""
+        # Add 20 hours (133% of 15)
+        ServiceLog.objects.create(
+            scholar=self.profile,
+            date_rendered=date(2026, 2, 15),
+            hours=20.0,
+            office_name='Library',
+            activity_description='Test'
+        )
+        
+        # Update total
+        self.profile.total_hours_rendered = 20.0
+        self.profile.save()
+        
+        # Percentage should be > 100
+        percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
+        self.assertGreater(percentage, 100)
+
+class ResponsiveDesignTests(TestCase):
+    """Tests for mobile responsiveness"""
+    
+    def setUp(self):
+        """Create test data"""
+        self.client = APIClient()
+    
+    def test_admin_dashboard_has_viewport(self):
+        """Test if admin dashboard has viewport meta tag"""
+        admin = User.objects.create_user(
+            username='admin',
+            password='test',
+            role='ADMIN',
+            is_email_verified=True
+        )
+        
+        self.client.force_login(admin)
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
+        
+        # Check that mobile-friendly meta tag is present
+        self.assertContains(response, 'viewport')
+        self.assertContains(response, 'width=device-width')
+    
+    def test_admin_dashboard_is_responsive(self):
+        """Test if admin dashboard has responsive CSS"""
+        admin = User.objects.create_user(
+            username='admin',
+            password='test',
+            role='ADMIN',
+            is_email_verified=True
+        )
+        
+        self.client.force_login(admin)
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
+        
+        # Check for responsive CSS classes (Tailwind)
+        self.assertContains(response, 'overflow-x-auto')
