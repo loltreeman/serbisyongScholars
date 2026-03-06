@@ -34,6 +34,16 @@ class ScholarProfile(models.Model):
     total_hours_rendered = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
     carry_over_hours = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
 
+
+    SCHOOL_CHOICES = [
+        ('SOSE', 'School of Science and Engineering'),
+        ('SOH', 'School of Humanities'),
+        ('JGSOM', 'John Gokongwei School of Management'),
+        ('RGLSOSS', 'Dr. Rosita G. Leong School of Social Sciences'),
+        ('GBSEALD', 'Gokongwei Brothers School of Education and Learning Design'),
+    ]
+    
+    school = models.CharField(max_length=10, choices=SCHOOL_CHOICES, blank=True, null=True)
     class Meta:
         indexes = [
             models.Index(fields=['user']),

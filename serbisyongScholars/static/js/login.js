@@ -18,33 +18,34 @@ form.addEventListener("submit", async (e) => {
         const data = await res.json();
 
         if (!res.ok) {
-            errorBox.textContent =
-                data.detail || data.error || "Invalid credentials";
+            errorBox.textContent = data.detail || data.error || "Invalid credentials";
             errorBox.classList.remove("hidden");
             return;
         }
 
-        if (data.access) {
-            localStorage.setItem("access", data.access);
-            localStorage.setItem("refresh", data.refresh);
+        // Store tokens
+        localStorage.setItem("access", data.access);
+        localStorage.setItem("refresh", data.refresh);
+
+        // Capture Role
+        const userRole = data.user ? data.user.role : null;
+        localStorage.setItem("userRole", userRole);
+        localStorage.setItem("loggedInUsername", data.user.username);
+
+        console.log("LOGIN SUCCESS. ROLE:", userRole);
+
+        // --- THE CRITICAL REDIRECT LOGIC ---
+        if (userRole === "ADMIN") {
+            window.location.replace("/api/admin/dashboard/");
+        } else if (userRole === "SCHOLAR") {
+            window.location.replace("/dashboard/");
+        } else {
+            // Fallback for Moderators or undefined
+            window.location.replace("/dashboard/");
         }
 
-        // Store username for dashboard lookup: prefer explicit user payload
-        if (data.user && data.user.username) {
-            localStorage.setItem("loggedInUsername", data.user.username);
-        } else if (data.access) {
-            // Fallback: decode JWT payload to extract username
-            try {
-                const payload = JSON.parse(atob(data.access.split(".")[1]));
-                if (payload && payload.username) {
-                    localStorage.setItem("loggedInUsername", payload.username);
-                }
-            } catch (e) {
-            }
-        }
-
-        window.location.href = "/dashboard";
     } catch (err) {
+        console.error(err);
         errorBox.textContent = "Connection error. Please try again.";
         errorBox.classList.remove("hidden");
     }

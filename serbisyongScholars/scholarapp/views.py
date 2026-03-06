@@ -1,18 +1,24 @@
 import threading
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.mail import send_mail
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.http import HttpResponseForbidden
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
+from django.shortcuts import render
 from .serializers import RegistrationSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .models import ScholarProfile, ServiceLog
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Avg, Q, Sum
+from .models import User, ScholarProfile, ServiceLog
 from django.http import JsonResponse
 from .models import Announcement
 
@@ -94,6 +100,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
             'email': self.user.email,
             'first_name': getattr(self.user, 'first_name', ''),
             'last_name': getattr(self.user, 'last_name', ''),
+            'role': self.user.role,
             'is_active': self.user.is_active,
         }
 
@@ -146,12 +153,96 @@ def get_recent_announcements(request):
     data = [{
         "id": a.id,
         "title": a.title,
-        "content": a.content[:100], # Snippet
-        "tag_name": a.category,     # e.g., "Urgent"
+        "content": a.content[:100], 
+        "tag_name": a.category,    
         "tag_color": "red" if a.category == "Urgent" else "amber"
     } for a in announcements]
     
     return JsonResponse(data, safe=False)
+
+def admin_dashboard_view(request):
+    """Render admin dashboard page"""
+    return render(request, 'admin_dashboard.html')
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_scholars_list(request):
+    """
+    Get all scholars for admin dashboard
+    API endpoint: /api/admin/scholars/
+    """
+    # Check if user is admin
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin access required'}, status=403)
+    
+    # Get filter parameters
+    status_filter = request.GET.get('status', 'all')
+    search_query = request.GET.get('search', '')
+    
+    # Get all scholar profiles
+    profiles = ScholarProfile.objects.select_related('user').all()
+    
+    # Apply search filter
+    if search_query:
+        profiles = profiles.filter(
+            Q(student_id__icontains=search_query) |
+            Q(user__first_name__icontains=search_query) |
+            Q(user__last_name__icontains=search_query)
+        )
+    
+    # Build scholar list
+    scholars = []
+    complete_count = 0
+    on_track_count = 0
+    behind_count = 0
+    
+    for profile in profiles:
+        rendered = profile.total_hours_rendered
+        required = profile.required_hours
+        percentage = (rendered / required * 100) if required > 0 else 0
+        
+        # Determine status
+        if percentage >= 100:
+            status = 'complete'
+            complete_count += 1
+        elif percentage >= 70:
+            status = 'on-track'
+            on_track_count += 1
+        else:
+            status = 'behind'
+            behind_count += 1
+        
+        # Apply status filter
+        if status_filter != 'all' and status != status_filter:
+            continue
+        
+        scholars.append({
+            'student_id': profile.student_id,
+            'name': f"{profile.user.first_name} {profile.user.last_name}",
+            'email': profile.user.email,
+            'program': profile.program_course,
+            'is_dormer': profile.is_dormer,
+            'rendered_hours': rendered,
+            'required_hours': required,
+            'carry_over': profile.carry_over_hours,
+            'status': status
+        })
+    
+    # Calculate stats
+    total_scholars = len(scholars)
+    completion_rate = (complete_count / total_scholars * 100) if total_scholars > 0 else 0
+    average_hours = profiles.aggregate(Avg('total_hours_rendered'))['total_hours_rendered__avg'] or 0
+    
+    return Response({
+        'total': total_scholars,
+        'complete': complete_count,
+        'on_track': on_track_count,
+        'behind': behind_count,
+        'completion_rate': completion_rate,
+        'average_hours': average_hours,
+        'scholars': scholars
+    })
 
 # @api_view(['POST'])
 # @permission_classes([AllowAny])
