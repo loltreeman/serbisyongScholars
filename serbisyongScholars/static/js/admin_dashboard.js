@@ -15,31 +15,43 @@ async function loadScholars() {
         
         const response = await fetch('/api/admin/scholars/', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access')}`
+                'Authorization': `Bearer ${localStorage.getItem('access')}` // Ensure this is 'access'
             }
         });
-
-        if (response.status === 401 || response.status === 403) {
-        // If token is missing or user isn't an ADMIN, send them back to login
-        window.location.href = '/login/';
-        }
         
-        if (!response.ok) {
-            throw new Error('Failed to load scholars');
-        }
+        if (!response.ok) throw new Error('Failed to load scholars');
         
         const data = await response.json();
         
-        allScholars = data.scholars;
+        allScholars = data.scholars || [];
         filteredScholars = allScholars;
         
         updateStats(data);
         renderTable(filteredScholars);
         
+        if (typeof Chart !== 'undefined') {
+            createCharts(data);
+        }
+
+        const now = new Date();
+        document.getElementById('last-updated').textContent = now.toLocaleTimeString();
+        
     } catch (error) {
-        console.error('Error loading scholars:', error);
+        console.error('JS CRASHED HERE:', error); 
         showError('Failed to load scholars. Please try again.');
     }
+}
+
+function createMiniProgress(percentage) {
+    const color = getProgressBarColor(percentage);
+    return `
+        <div class="flex items-center">
+            <div class="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                <div class="${color} h-2 rounded-full" style="width: ${Math.min(percentage, 100)}%"></div>
+            </div>
+            <span class="text-xs text-gray-600">${percentage}%</span>
+        </div>
+    `;
 }
 
 /**
@@ -90,15 +102,7 @@ function renderTable(scholars) {
                 ${scholar.program || 'N/A'}
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-                <div class="w-full">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs text-gray-600">${percentage}%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div class="h-2 rounded-full ${getProgressBarColor(percentage)}" 
-                             style="width: ${Math.min(percentage, 100)}%"></div>
-                    </div>
-                </div>
+                ${createMiniProgress(percentage)}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 ${scholar.rendered_hours}/${scholar.required_hours}
@@ -119,7 +123,6 @@ function renderTable(scholars) {
         tbody.appendChild(row);
     });
 }
-
 /**
  * Apply filters
  */
@@ -250,3 +253,108 @@ function logout() {
     localStorage.clear();
     window.location.href = '/login/';
 }
+
+/**
+ * Create charts
+ */
+function createCharts(data) {
+    // Destroy existing charts if they exist
+    if (window.distributionChart) window.distributionChart.destroy();
+    if (window.officeChart) window.officeChart.destroy();
+
+    const distributionCtx = document.getElementById('distribution-chart');
+    if (distributionCtx) {
+        window.distributionChart = new Chart(distributionCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Complete', 'On Track', 'Behind'],
+                datasets: [{
+                    data: [data.complete || 0, data.on_track || 0, data.behind || 0],
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = data.total || 1;
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    const officeCtx = document.getElementById('office-chart');
+    if (officeCtx && data.office_stats) {
+        const officeNames = data.office_stats.map(stat => stat.office_name);
+        const officeHours = data.office_stats.map(stat => stat.total_hours);
+        
+        window.officeChart = new Chart(officeCtx, {
+            type: 'bar',
+            data: {
+                labels: officeNames,
+                datasets: [{
+                    label: 'Total Hours',
+                    data: officeHours,
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 6,
+                    maxBarThickness: 60
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.parsed.y} hours`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value + 'h';
+                            }
+                        },
+                        grid: {
+                            color: '#e5e7eb'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
