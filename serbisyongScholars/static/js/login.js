@@ -34,7 +34,6 @@ form.addEventListener("submit", async (e) => {
 
         console.log("LOGIN SUCCESS. ROLE:", userRole);
 
-        // --- THE CRITICAL REDIRECT LOGIC ---
         if (userRole === "ADMIN") {
             window.location.replace("/api/admin/dashboard/");
         } else if (userRole === "SCHOLAR") {

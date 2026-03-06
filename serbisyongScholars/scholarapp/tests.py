@@ -1,5 +1,5 @@
 from rest_framework.test import APIClient
-from django.test import TestCase
+from django.test import TestCase, Client  
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from datetime import date
@@ -10,7 +10,7 @@ User = get_user_model()
 class AdminDashboardTests(TestCase):
     """Tests for Admin Dashboard page"""
     
-    def setUp(self):  # ← YOU'RE MISSING THIS LINE!
+    def setUp(self):
         """Create test data"""
         # Create admin user
         self.admin = User.objects.create_user(
@@ -56,7 +56,10 @@ class AdminDashboardTests(TestCase):
             profile.total_hours_rendered = hours
             profile.save()
         
-        self.client = APIClient()
+        # Use regular Client for HTML views
+        self.client = Client()
+        # Use APIClient for API endpoints
+        self.api_client = APIClient()
     
     def test_admin_dashboard_page_loads(self):
         """Test if admin dashboard page renders successfully"""
@@ -74,11 +77,11 @@ class AdminDashboardTests(TestCase):
     
     def test_admin_dashboard_shows_correct_stats(self):
         """Test if dashboard shows correct scholar statistics"""
-        self.client.force_login(self.admin)
+        self.api_client.force_authenticate(user=self.admin)
         
-        # Make sure we're logged in by adding session
+        # Use API client for API endpoint
         url = reverse('admin_scholars_list')
-        response = self.client.get(url)
+        response = self.api_client.get(url)
         
         # Should return 200 now
         self.assertEqual(response.status_code, 200)
@@ -95,11 +98,11 @@ class AdminDashboardTests(TestCase):
     
     def test_scholar_filtering_by_status(self):
         """Test if filtering by completion status works"""
-        self.client.force_login(self.admin)
+        self.api_client.force_authenticate(user=self.admin)
         
         # Filter for complete scholars
         url = reverse('admin_scholars_list')
-        response = self.client.get(url, {'status': 'complete'})
+        response = self.api_client.get(url, {'status': 'complete'})
         
         # Check if response is JSON
         if response.status_code == 200:
@@ -112,10 +115,10 @@ class AdminDashboardTests(TestCase):
     
     def test_scholar_search_functionality(self):
         """Test if search by student ID works"""
-        self.client.force_login(self.admin)
+        self.api_client.force_authenticate(user=self.admin)
         
         url = reverse('admin_scholars_list')
-        response = self.client.get(url, {'search': '123450'})
+        response = self.api_client.get(url, {'search': '123450'})
         
         # Check if response is JSON
         if response.status_code == 200:
@@ -127,7 +130,7 @@ class AdminDashboardTests(TestCase):
     
     def test_admin_dashboard_requires_auth(self):
         """Test if dashboard requires authentication"""
-        # Try to access without login
+        # Try to access without login - use regular client
         url = reverse('admin_dashboard')
         response = self.client.get(url)
         
@@ -136,7 +139,7 @@ class AdminDashboardTests(TestCase):
     
     def test_admin_dashboard_requires_admin_role(self):
         """Test if non-admin users are blocked"""
-        # Login as scholar (not admin)
+        # Login as scholar (not admin) - use regular client
         scholar = User.objects.filter(role='SCHOLAR').first()
         self.client.force_login(scholar)
         
@@ -145,6 +148,7 @@ class AdminDashboardTests(TestCase):
         
         # Should be forbidden (403)
         self.assertEqual(response.status_code, 403)
+
 
 class ProgressVisualizationTests(TestCase):
     """Tests for progress bar components"""
@@ -170,7 +174,7 @@ class ProgressVisualizationTests(TestCase):
             required_hours=15.0
         )
         
-        self.client = APIClient()
+        self.client = Client()  # Changed to Client
     
     def test_progress_calculation_80_percent(self):
         """Test if progress calculates 80% correctly"""
@@ -229,12 +233,13 @@ class ProgressVisualizationTests(TestCase):
         percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
         self.assertGreater(percentage, 100)
 
+
 class ResponsiveDesignTests(TestCase):
     """Tests for mobile responsiveness"""
     
     def setUp(self):
         """Create test data"""
-        self.client = APIClient()
+        self.client = Client()  # ← Changed from APIClient
     
     def test_admin_dashboard_has_viewport(self):
         """Test if admin dashboard has viewport meta tag"""
