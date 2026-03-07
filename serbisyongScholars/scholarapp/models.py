@@ -55,7 +55,7 @@ class ScholarProfile(models.Model):
 
 class ModeratorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='moderator_profile')
-    aoffice_name = models.CharField(max_length=200) # Matches the office_name format in ServiceLog
+    office_name = models.CharField(max_length=200) # Matches the office_name format in ServiceLog
 
     class Meta:
         indexes = [
