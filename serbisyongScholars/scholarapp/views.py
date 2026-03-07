@@ -20,12 +20,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
-from .models import User, ScholarProfile, ServiceLog
+from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile
 from django.http import JsonResponse
-from .models import Announcement
+
 
 User = get_user_model()
-
 
 # Register a new user by default it is a scholar
 # -- SignUp View -- #
@@ -346,6 +345,43 @@ def admin_scholars_list(request):
         'office_stats': list(office_stats) 
     })
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def assign_moderator(request):
+    """
+    Assign a moderator to an office
+    API endpoint: /api/admin/assign-moderator/
+    Allows OAA (ADMIN) to assign moderator access to an office.
+    """
+    
+    # Check if user is admin
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin access required'}, status=403)
+    
+    # Get moderator username and office name from request
+    moderator_username = request.data.get('moderator_username')
+    office_name = request.data.get('office_name')
+    
+    if not moderator_username or not office_name:
+        return Response({'error': 'Moderator username and office name are required'}, status=400)
+    
+    # Find the user and update their status to moderator, and create/update their ModeratorProfile
+    try:
+        target_user = User.objects.get(username=moderator_username)
+        target_user.role = 'MODERATOR'
+        target_user.save()
+        
+        #Link them to the office by creating/updating their ModeratorProfile
+        ModeratorProfile.objects.update_or_create(
+            user=target_user,
+            defaults={'office_name': office_name}
+        )
+        return Response({'message': f'Moderator {moderator_username} assigned to {office_name}'})
+    except User.DoesNotExist:
+        return Response({'error': 'Moderator user not found'}, status=404)
+    except Exception as e:
+            return Response({'error': str(e)}, status=500)
+        
 # @api_view(['POST'])
 # @permission_classes([AllowAny])
 # def login(request):
