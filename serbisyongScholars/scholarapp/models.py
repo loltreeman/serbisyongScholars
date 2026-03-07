@@ -53,6 +53,18 @@ class ScholarProfile(models.Model):
     def __str__(self):
         return f"{self.student_id} - {self.user.username}"
 
+class ModeratorProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='moderator_profile')
+    aoffice_name = models.CharField(max_length=200) # Matches the office_name format in ServiceLog
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user']),
+        ]
+
+    def __str__(self):
+        return f"Moderator: {self.user.username}"
+    
 class ServiceLog(models.Model):
     scholar = models.ForeignKey(ScholarProfile, on_delete=models.CASCADE, related_name='service_logs', db_index=True)
     date_rendered = models.DateField(db_index=True)
@@ -93,7 +105,6 @@ class ServiceLog(models.Model):
         # Recalculate total hours atomically
         total = ServiceLog.objects.filter(scholar=scholar).aggregate(Sum('hours'))['hours__sum'] or 0
         ScholarProfile.objects.filter(pk=scholar.pk).update(total_hours_rendered=total)
-
 
 class Announcement(models.Model):
     CATEGORY_CHOICES = [
