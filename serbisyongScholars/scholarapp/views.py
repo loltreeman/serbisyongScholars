@@ -345,11 +345,11 @@ def admin_scholars_list(request):
         'office_stats': list(office_stats) 
     })
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def assign_moderator(request):
     """
-    Assign a moderator to an office
+    Render assign moderator page (GET) and assign moderator (POST)
     API endpoint: /api/admin/assign-moderator/
     Allows OAA (ADMIN) to assign moderator access to an office.
     """
@@ -357,6 +357,10 @@ def assign_moderator(request):
     # Check if user is admin
     if request.user.role != 'ADMIN':
         return Response({'error': 'Admin access required'}, status=403)
+
+    # Serve the HTML page when user opens the Assign link.
+    if request.method == 'GET':
+        return render(request, 'assign_moderator.html')
     
     # Get moderator username and office name from request
     moderator_username = request.data.get('moderator_username')
