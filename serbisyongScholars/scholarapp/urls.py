@@ -11,4 +11,5 @@ urlpatterns = [
     path('admin/dashboard/', views.admin_dashboard_view, name='admin_dashboard'),
     path('admin/scholars/', views.admin_scholars_list, name='admin_scholars_list'),
     path('announcements/', views.get_recent_announcements, name='api_announcements'),
+    path('admin/assign-moderator/', views.assign_moderator, name='assign_moderator'),
 ]
