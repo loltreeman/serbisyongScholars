@@ -6,21 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - serbisyongScholar</title>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="{% static 'css/progress.css' %}">
 </head>
 <body class="bg-gray-50">
     
     {% include 'partials/navbar.html' %}
     
     <div class="max-w-7xl mx-auto px-4 py-8">
-        <!-- Page Header -->
         <div class="mb-8">
             <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
             <p class="text-gray-600">Service Hour Overview • Academic Year 2025-2026</p>
         </div>
         
-        <!-- Stats Cards Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- Card 1: Total Scholars -->
             <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
                 <div class="flex items-center justify-between">
                     <div>
@@ -35,7 +34,6 @@
                 </div>
             </div>
             
-            <!-- Card 2: Completion Rate -->
             <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
                 <div class="flex items-center justify-between">
                     <div>
@@ -50,7 +48,6 @@
                 </div>
             </div>
             
-            <!-- Card 3: Behind Schedule -->
             <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
                 <div class="flex items-center justify-between">
                     <div>
@@ -65,7 +62,6 @@
                 </div>
             </div>
             
-            <!-- Card 4: Average Hours -->
             <div class="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
                 <div class="flex items-center justify-between">
                     <div>
@@ -80,12 +76,30 @@
                 </div>
             </div>
         </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+                    <span class="mr-2">📊</span> Scholar Status Distribution
+                </h3>
+                <div class="relative h-64">
+                    <canvas id="distribution-chart"></canvas>
+                </div>
+            </div>
+            <div class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+                    <span class="mr-2">📈</span> Service Hours by Office
+                </h3>
+                <div class="relative h-64">
+                    <canvas id="office-chart"></canvas>
+                </div>
+            </div>
+        </div>
+                
         
-        <!-- Filter Section -->
         <div class="bg-white rounded-lg shadow p-6 mb-6">
             <h2 class="text-lg font-semibold mb-4">Filters</h2>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <!-- Status Filter -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                     <select id="filter-status" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
@@ -95,8 +109,7 @@
                         <option value="behind">Behind</option>
                     </select>
                 </div>
-                
-                <!-- School Filter -->
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">School</label>
                     <select id="filter-school" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
@@ -109,14 +122,12 @@
                     </select>
                 </div>
                 
-                <!-- Search -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
                     <input type="text" id="search-input" placeholder="Name or Student ID..." 
                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
                 </div>
                 
-                <!-- Apply Button -->
                 <div class="flex items-end">
                     <button onclick="applyFilters()" 
                             class="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold">
@@ -126,10 +137,10 @@
             </div>
         </div>
         
-        <!-- Scholar Table -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-200">
                 <h2 class="text-lg font-semibold">All Scholars</h2>
+                <p class="text-sm text-gray-500">Last updated: <span id="last-updated">Never</span></p>
             </div>
             
             <div class="overflow-x-auto">
@@ -160,7 +171,6 @@
                         </tr>
                     </thead>
                     <tbody id="scholar-table" class="bg-white divide-y divide-gray-200">
-                        <!-- Populated by JavaScript -->
                         <tr>
                             <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                                 <div class="flex flex-col items-center">
@@ -176,7 +186,8 @@
             </div>
         </div>
     </div>
-    
+
     <script src="{% static 'js/admin_dashboard.js' %}"></script>
+    <script src="{% static 'js/progress.js' %}"></script>
 </body>
 </html>

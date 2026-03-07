@@ -12,7 +12,6 @@ form.addEventListener("submit", async (e) => {
     submitBtn.textContent = "Creating account...";
 
     const payload = {
-        username: document.getElementById("username").value,
         email: document.getElementById("email").value,
         password: document.getElementById("password").value,
         password_confirm: document.getElementById("password_confirm").value,
@@ -21,11 +20,14 @@ form.addEventListener("submit", async (e) => {
         student_id: document.getElementById("student_id").value,
     };
 
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
     try {
         const res = await fetch("/api/signup/", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
             body: JSON.stringify(payload),
+            
         });
 
         const data = await res.json();
