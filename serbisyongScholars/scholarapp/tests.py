@@ -1,9 +1,10 @@
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APITestCase
+from rest_framework import status
 from django.test import TestCase, Client  
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from datetime import date
-from .models import User, ScholarProfile, ServiceLog
+from .models import User, ScholarProfile, ServiceLog, ModeratorProfile
 
 User = get_user_model()
 
@@ -149,7 +150,6 @@ class AdminDashboardTests(TestCase):
         # Should be forbidden (403)
         self.assertEqual(response.status_code, 403)
 
-
 class ProgressVisualizationTests(TestCase):
     """Tests for progress bar components"""
     
@@ -233,7 +233,6 @@ class ProgressVisualizationTests(TestCase):
         percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
         self.assertGreater(percentage, 100)
 
-
 class ResponsiveDesignTests(TestCase):
     """Tests for mobile responsiveness"""
     
@@ -273,3 +272,108 @@ class ResponsiveDesignTests(TestCase):
         
         # Check for responsive CSS classes (Tailwind)
         self.assertContains(response, 'overflow-x-auto')
+
+
+class AuthenticationTests(APITestCase):
+    def test_signup_successful(self):
+        """Test that a user can sign up with a valid Ateneo email"""
+        url = reverse('api_signup') # Make sure this matches the 'name' in urls.py
+        data = {
+            "email": "test.scholar@student.ateneo.edu",
+            "password": "SecurePassword123!",
+            "first_name": "Test",
+            "last_name": "Scholar"
+        }
+        response = self.client.post(url, data, format='json')
+        
+        # Check that it returns 201 Created
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Check that the user was actually created in the database
+        self.assertTrue(User.objects.filter(email="test.scholar@student.ateneo.edu").exists())
+        
+        # Check that the user is initially inactive (waiting for email verification)
+        user = User.objects.get(email="test.scholar@student.ateneo.edu")
+        self.assertFalse(user.is_active)
+        self.assertEqual(user.role, 'SCHOLAR')
+
+    def test_signup_invalid_email(self):
+        """Test that non-Ateneo emails are rejected"""
+        url = reverse('api_signup')
+        data = {
+            "email": "hacker@gmail.com",
+            "password": "SecurePassword123!",
+            "first_name": "Bad",
+            "last_name": "Actor"
+        }
+        response = self.client.post(url, data, format='json')
+        
+        # Should return 400 Bad Request
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # Verify no user was created
+        self.assertFalse(User.objects.filter(email="hacker@gmail.com").exists())
+
+
+class AdminModeratorTests(APITestCase):
+    def setUp(self):
+        """Set up dummy data to use in the tests below"""
+        # Create an Admin User
+        self.admin_user = User.objects.create_user(
+            username="admin1",
+            email="admin@ateneo.edu",
+            password="adminpassword",
+            role="ADMIN",
+            is_active=True
+        )
+        
+        # Create a regular Scholar User
+        self.scholar_user = User.objects.create_user(
+            username="scholar1",
+            email="regular@student.ateneo.edu",
+            password="scholarpassword",
+            role="SCHOLAR",
+            is_active=True
+        )
+        
+        # The URL for the assign moderator endpoint
+        self.assign_url = reverse('assign_moderator')
+
+    def test_admin_can_assign_moderator(self):
+        """Test that an OAA Admin can successfully make someone a moderator"""
+        # 1. Authenticate the test client as the Admin
+        self.client.force_authenticate(user=self.admin_user)
+        
+        # 2. Send the POST request to assign the scholar to an office
+        data = {
+            "user_id": self.scholar_user.id,
+            "office_name": "Office of Admission and Aid"
+        }
+        response = self.client.post(self.assign_url, data, format='json')
+        
+        # 3. Check for success response
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # 4. Refresh the scholar user from the database and verify changes
+        self.scholar_user.refresh_from_db()
+        self.assertEqual(self.scholar_user.role, 'MODERATOR')
+        self.assertTrue(ModeratorProfile.objects.filter(user=self.scholar_user).exists())
+        self.assertEqual(self.scholar_user.moderator_profile.office_name, "Office of Admission and Aid")
+
+    def test_scholar_cannot_assign_moderator(self):
+        """Test that a regular student cannot use the assign moderator endpoint"""
+        # 1. Authenticate the test client as a regular Scholar
+        self.client.force_authenticate(user=self.scholar_user)
+        
+        # 2. Try to perform the admin action
+        data = {
+            "user_id": self.scholar_user.id,
+            "office_name": "Hacker Office"
+        }
+        response = self.client.post(self.assign_url, data, format='json')
+        
+        # 3. Should return 403 Forbidden
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+        # 4. Verify their role did NOT change
+        self.scholar_user.refresh_from_db()
+        self.assertEqual(self.scholar_user.role, 'SCHOLAR')
