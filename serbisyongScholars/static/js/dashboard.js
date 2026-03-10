@@ -39,7 +39,7 @@ async function load() {
 
         const data = await res.json();
 
-        // --- Rendering Logic ---
+        // --- Rendering Logic for Stats ---
         userNameEl.textContent = data.name || username;
         metaEl.textContent = `${data.student_id || "N/A"} • ${
             data.is_dormer ? "Dormer" : "Non-Dormer"
@@ -47,9 +47,7 @@ async function load() {
 
         const rendered = parseFloat(data.rendered_hours) || 0;
         const required = parseFloat(data.required_hours) || 15;
-        const percentage = Math.min((rendered / required) * 100, 100).toFixed(
-            1
-        );
+        const percentage = Math.min((rendered / required) * 100, 100).toFixed(1);
         const remaining = Math.max(required - rendered, 0);
         const activities = data.service_logs ? data.service_logs.length : 0;
 
@@ -67,6 +65,7 @@ async function load() {
             progressBar.classList.add("complete");
         }
 
+        // --- Rendering Logic for Service Logs Table ---
         if (!data.service_logs || data.service_logs.length === 0) {
             logsContainer.innerHTML = `
           <div class="empty-state">
@@ -74,23 +73,47 @@ async function load() {
             <div>No service hours recorded yet.</div>
           </div>`;
         } else {
-            let html =
-                '<table><thead><tr><th>Date</th><th>Activity</th><th>Office</th><th style="text-align: right;">Hours</th><th style="text-align: center;">Status</th></tr></thead><tbody>';
+            const userRole = localStorage.getItem("userRole"); //
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Activity</th>
+                            <th>Office</th>
+                            <th style="text-align: right;">Hours</th>
+                            <th style="text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
             data.service_logs.forEach((log) => {
-                const status = log.status || "Approved";
-                const statusClass =
-                    status === "Approved"
-                        ? "status-approved"
-                        : "status-pending";
+                // Calculate the 7-day window if created_at is provided by backend
+                const createdAt = new Date(log.created_at);
+                const now = new Date();
+                const diffInDays = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+                const withinWindow = diffInDays <= 7;
+
+                // Determine permission logic
+                const canManage = (userRole === 'ADMIN' || (userRole === 'MODERATOR' && withinWindow));
+
                 html += `
-            <tr>
-              <td>${log.date}</td>
-              <td>${log.activity}</td>
-              <td>${log.office}</td>
-              <td style="text-align: right; font-weight: 600;">${log.hours}</td>
-              <td style="text-align: center;"><span class="status-badge ${statusClass}">${status}</span></td>
-            </tr>`;
+                    <tr>
+                      <td>${log.date}</td>
+                      <td>${log.activity}</td>
+                      <td>${log.office}</td>
+                      <td style="text-align: right; font-weight: 600;">${log.hours}</td>
+                      <td style="text-align: center;">
+                        ${canManage ? `
+                            <button onclick="editLog(${log.id})" class="text-blue-600 hover:underline">Edit</button>
+                            <button onclick="deleteLog(${log.id})" class="text-red-600 hover:underline ml-2">Delete</button>
+                        ` : `
+                            <span class="text-gray-400 italic text-xs">Locked</span>
+                        `}
+                      </td>
+                    </tr>`;
             });
+
             html += "</tbody></table>";
             logsContainer.innerHTML = html;
         }
