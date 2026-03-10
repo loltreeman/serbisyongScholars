@@ -3,7 +3,8 @@ from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login as django_login
 from django.contrib.auth.decorators import login_required
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.mail import send_mail
@@ -22,6 +23,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
 from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile
 from django.http import JsonResponse
+from django.utils import timezone
+from datetime import timedelta
 
 
 User = get_user_model()
@@ -99,6 +102,51 @@ def verify_email(request):
     else:
         return Response({'error': 'Invalid or expired verification link.'}, status=status.HTTP_400_BAD_REQUEST)
     
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def manage_service_log(request, log_id):
+    try:
+        log = ServiceLog.objects.get(pk=log_id)
+    except ServiceLog.DoesNotExist:
+        return Response({'error': 'Log not found'}, status=404)
+
+    # Determine if the 7-day window has passed
+    now = timezone.now()
+    days_passed = (now - log.created_at).days
+    is_within_window = days_passed <= 7
+
+    # Check Permissions
+    user = request.user
+    
+    # ADMINS Can always edit/delete
+    if user.role == 'ADMIN':
+        pass 
+    
+    # MOD Check if they created it and if within 7 days
+    elif user.role == 'MODERATOR':
+        if log.created_by != user:
+            return Response({'error': 'You can only edit logs you created.'}, status=403)
+        
+        if not is_within_window:
+            return Response({
+                'error': f'The 7-day edit window has expired ({days_passed} days ago). Please contact an Admin for approval.'
+            }, status=403)
+            
+    # Scholars are blocked from editing logs directly
+    else:
+        return Response({'error': 'Scholars cannot edit service logs.'}, status=403)
+
+    if request.method == 'PATCH':
+        serializer = ServiceLogSerializer(log, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Log updated successfully', 'log': serializer.data})
+        return Response(serializer.errors, status=400)
+
+    elif request.method == 'DELETE':
+        log.delete()
+        return Response({'message': 'Log deleted successfully'}, status=204)
+
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         # 1. Capture the input (which might be an email)
@@ -225,10 +273,12 @@ def get_scholar_dashboard(request):
             'carry_over': scholar.carry_over_hours,
             'service_logs': [
                 {
+                    'id': log.id,
                     'date': log.date_rendered,
                     'hours': log.hours,
                     'office': log.office_name,
                     'activity': log.activity_description
+                    'created_at': log.created_at,
                 }
                 for log in service_logs
             ]
