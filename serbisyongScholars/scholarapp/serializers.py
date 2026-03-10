@@ -1,7 +1,12 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
-from .models import User, ScholarProfile
+from .models import User, ScholarProfile, ServiceLog
 
+
+class ServiceLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceLog
+        fields = ['id', 'date_rendered', 'hours', 'office_name', 'activity_description']
 
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
