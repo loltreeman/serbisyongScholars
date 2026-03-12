@@ -10,5 +10,6 @@ urlpatterns = [
     path('scholar/dashboard/', views.get_scholar_dashboard, name='api_dashboard'),
     path('admin/dashboard/', views.admin_dashboard_view, name='admin_dashboard'),
     path('admin/scholars/', views.admin_scholars_list, name='admin_scholars_list'),
+    path('profile/', views.user_profile, name='api_profile'),
     path('announcements/', views.get_recent_announcements, name='api_announcements'),
 ]
