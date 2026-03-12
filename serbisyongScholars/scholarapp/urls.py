@@ -12,4 +12,5 @@ urlpatterns = [
     path('admin/scholars/', views.admin_scholars_list, name='admin_scholars_list'),
     path('profile/', views.user_profile, name='api_profile'),
     path('announcements/', views.get_recent_announcements, name='api_announcements'),
+    path('admin/assign-moderator/', views.assign_moderator, name='assign_moderator'),
 ]

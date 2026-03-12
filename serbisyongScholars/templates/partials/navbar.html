@@ -1,20 +1,45 @@
-<nav class="bg-blue-900 text-white shadow-lg">
-    <div class="max-w-7xl mx-auto px-4">
+<nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
-            <div class="flex items-center space-x-4">
-                <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                    <span class="text-blue-900 font-bold">S</span>
+            
+            <div class="flex items-center space-x-3 shrink-0">
+                <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center shadow-inner">
+                    <span class="text-blue-900 font-extrabold text-xl">S</span>
                 </div>
-                <span class="text-xl font-bold">serbisyongScholar</span>
+                <span class="text-xl font-bold tracking-tight hidden sm:block">serbisyongScholar</span>
             </div>
-            <div class="flex space-x-6">
-                <a href="/dashboard" class="hover:text-yellow-400">Dashboard</a>
-                <a href="/admin/dashboard" class="text-yellow-400 font-semibold">Admin</a>
-                <a href="/encode" class="hover:text-yellow-400">Encode Hours</a>
-                <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">
+
+            <div class="hidden md:flex items-center space-x-2">
+
+                <a href="{% url 'admin_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition flex items-center gap-2">
+                    Admin
+                </a>
+
+                <a href="/profile" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition flex items-center gap-2">
+                    Profile
+                </a>
+
+                <a href="/encode" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition flex items-center gap-2">
+                    Encode
+                </a>
+
+                <a href="{% url 'assign_moderator' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition flex items-center gap-2">
+                    Assign 
+                </a>
+
+                <div class="h-6 w-px bg-blue-700 mx-2"></div>
+
+                <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-700 transition shadow-md active:scale-95">
                     Logout
                 </button>
             </div>
+
+            <div class="md:hidden">
+                <button onclick="logout()" class="bg-red-600 px-3 py-1.5 rounded-lg text-xs font-bold">
+                    Logout
+                </button>
+            </div>
+
         </div>
     </div>
 </nav>

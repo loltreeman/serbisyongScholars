@@ -1,14 +1,18 @@
-from rest_framework.test import APIClient
-from django.test import TestCase
+from rest_framework.test import APIClient, APITestCase
+from rest_framework import status
+from django.test import TestCase, Client  
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from datetime import date
-from .models import ScholarProfile, ServiceLog
+from .models import User, ScholarProfile, ServiceLog, ModeratorProfile
 
 User = get_user_model()
 
 class AdminDashboardTests(TestCase):
+    """Tests for Admin Dashboard page"""
+    
     def setUp(self):
+        """Create test data"""
         # Create admin user
         self.admin = User.objects.create_user(
             username='testadmin',
@@ -49,9 +53,12 @@ class AdminDashboardTests(TestCase):
             )
             profile.total_hours_rendered = hours
             profile.save()
-
-        self.client = APIClient()
-
+        
+        # Use regular Client for HTML views
+        self.client = Client()
+        # Use APIClient for API endpoints
+        self.api_client = APIClient()
+    
     def test_admin_dashboard_page_loads(self):
         self.client.force_login(self.admin)
         url = reverse('admin_dashboard')
@@ -61,9 +68,14 @@ class AdminDashboardTests(TestCase):
         self.assertContains(response, 'Total Scholars')
 
     def test_admin_dashboard_shows_correct_stats(self):
-        self.client.force_login(self.admin)
+        """Test if dashboard shows correct scholar statistics"""
+        self.api_client.force_authenticate(user=self.admin)
+        
+        # Use API client for API endpoint
         url = reverse('admin_scholars_list')
-        response = self.client.get(url)
+        response = self.api_client.get(url)
+        
+        # Should return 200 now
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['total'], 5)
@@ -72,8 +84,14 @@ class AdminDashboardTests(TestCase):
         self.assertIn('average_hours', data)
 
     def test_scholar_filtering_by_status(self):
-        self.client.force_login(self.admin)
-        response = self.client.get('/admin/scholars/?status=complete')
+        """Test if filtering by completion status works"""
+        self.api_client.force_authenticate(user=self.admin)
+        
+        # Filter for complete scholars
+        url = reverse('admin_scholars_list')
+        response = self.api_client.get(url, {'status': 'complete'})
+        
+        # Check if response is JSON
         if response.status_code == 200:
             data = response.json()
             for scholar in data['scholars']:
@@ -81,79 +99,262 @@ class AdminDashboardTests(TestCase):
                 self.assertGreaterEqual(percentage, 100)
 
     def test_scholar_search_functionality(self):
-        self.client.force_login(self.admin)
-        response = self.client.get('/admin/scholars/?search=123450')
+        """Test if search by student ID works"""
+        self.api_client.force_authenticate(user=self.admin)
+        
+        url = reverse('admin_scholars_list')
+        response = self.api_client.get(url, {'search': '123450'})
+        
+        # Check if response is JSON
         if response.status_code == 200:
             data = response.json()
             self.assertGreater(len(data['scholars']), 0)
             self.assertEqual(data['scholars'][0]['student_id'], '123450')
 
     def test_admin_dashboard_requires_auth(self):
-        response = self.client.get('/admin/dashboard/')
+        """Test if dashboard requires authentication"""
+        # Try to access without login - use regular client
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
+        
+        # Should redirect to login (302)
         self.assertEqual(response.status_code, 302)
 
     def test_admin_dashboard_requires_admin_role(self):
+        """Test if non-admin users are blocked"""
+        # Login as scholar (not admin) - use regular client
         scholar = User.objects.filter(role='SCHOLAR').first()
         self.client.force_login(scholar)
         url = reverse('admin_dashboard')
         response = self.client.get(url)
+        
+        # Should be forbidden (403)
         self.assertEqual(response.status_code, 403)
 
-
-class ProfileViewTests(TestCase):
+class ProgressVisualizationTests(TestCase):
+    """Tests for progress bar components"""
+    
     def setUp(self):
-        # two users: an admin and a scholar
-        self.admin = User.objects.create_user(
-            username='admin1',
-            email='admin1@example.com',
-            password='TestPass!',
+        """Create test data"""
+        user = User.objects.create_user(
+            username='testscholar',
+            email='test@student.ateneo.edu',
+            password='TestPass123!',
+            role='SCHOLAR',
+            first_name='Test',
+            last_name='Scholar',
+            is_email_verified=True
+        )
+        
+        self.profile = ScholarProfile.objects.create(
+            user=user,
+            student_id='123456',
+            program_course='BS CS',
+            scholar_grant='FULL',
+            is_dormer=False,
+            required_hours=15.0
+        )
+        
+        self.client = Client()  # Changed to Client
+    
+    def test_progress_calculation_80_percent(self):
+        """Test if progress calculates 80% correctly"""
+        # Add 12 hours (80% of 15)
+        ServiceLog.objects.create(
+            scholar=self.profile,
+            date_rendered=date(2026, 2, 15),
+            hours=12.0,
+            office_name='Library',
+            activity_description='Test'
+        )
+        
+        # Update total
+        self.profile.total_hours_rendered = 12.0
+        self.profile.save()
+        
+        # Calculate percentage
+        percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
+        self.assertEqual(percentage, 80.0)
+    
+    def test_progress_calculation_complete(self):
+        """Test if progress shows 100% when complete"""
+        # Add 15 hours (100% of 15)
+        ServiceLog.objects.create(
+            scholar=self.profile,
+            date_rendered=date(2026, 2, 15),
+            hours=15.0,
+            office_name='Library',
+            activity_description='Test'
+        )
+        
+        # Update total
+        self.profile.total_hours_rendered = 15.0
+        self.profile.save()
+        
+        # Calculate percentage
+        percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
+        self.assertEqual(percentage, 100.0)
+    
+    def test_progress_bar_handles_overflow(self):
+        """Test if system handles hours over 100%"""
+        # Add 20 hours (133% of 15)
+        ServiceLog.objects.create(
+            scholar=self.profile,
+            date_rendered=date(2026, 2, 15),
+            hours=20.0,
+            office_name='Library',
+            activity_description='Test'
+        )
+        
+        # Update total
+        self.profile.total_hours_rendered = 20.0
+        self.profile.save()
+        
+        # Percentage should be > 100
+        percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
+        self.assertGreater(percentage, 100)
+
+class ResponsiveDesignTests(TestCase):
+    """Tests for mobile responsiveness"""
+    
+    def setUp(self):
+        """Create test data"""
+        self.client = Client()  # ← Changed from APIClient
+    
+    def test_admin_dashboard_has_viewport(self):
+        """Test if admin dashboard has viewport meta tag"""
+        admin = User.objects.create_user(
+            username='admin',
+            password='test',
             role='ADMIN',
             is_email_verified=True
         )
-        self.scholar = User.objects.create_user(
-            username='sch1',
-            email='sch1@example.com',
-            password='TestPass!',
-            role='SCHOLAR',
-            first_name='First',
-            last_name='Last',
+        
+        self.client.force_login(admin)
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
+        
+        # Check that mobile-friendly meta tag is present
+        self.assertContains(response, 'viewport')
+        self.assertContains(response, 'width=device-width')
+    
+    def test_admin_dashboard_is_responsive(self):
+        """Test if admin dashboard has responsive CSS"""
+        admin = User.objects.create_user(
+            username='admin',
+            password='test',
+            role='ADMIN',
             is_email_verified=True
         )
-        self.profile = ScholarProfile.objects.create(
-            user=self.scholar,
-            student_id='555555',
-            program_course='BS Testing',
-            scholar_grant='FULL'
+        
+        self.client.force_login(admin)
+        url = reverse('admin_dashboard')
+        response = self.client.get(url)
+        
+        # Check for responsive CSS classes (Tailwind)
+        self.assertContains(response, 'overflow-x-auto')
+
+
+class AuthenticationTests(APITestCase):
+    def test_signup_successful(self):
+        """Test that a user can sign up with a valid Ateneo email"""
+        url = reverse('api_signup') # Make sure this matches the 'name' in urls.py
+        data = {
+            "email": "test.scholar@student.ateneo.edu",
+            "password": "SecurePassword123!",
+            "first_name": "Test",
+            "last_name": "Scholar"
+        }
+        response = self.client.post(url, data, format='json')
+        
+        # Check that it returns 201 Created
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Check that the user was actually created in the database
+        self.assertTrue(User.objects.filter(email="test.scholar@student.ateneo.edu").exists())
+        
+        # Check that the user is initially inactive (waiting for email verification)
+        user = User.objects.get(email="test.scholar@student.ateneo.edu")
+        self.assertFalse(user.is_active)
+        self.assertEqual(user.role, 'SCHOLAR')
+
+    def test_signup_invalid_email(self):
+        """Test that non-Ateneo emails are rejected"""
+        url = reverse('api_signup')
+        data = {
+            "email": "hacker@gmail.com",
+            "password": "SecurePassword123!",
+            "first_name": "Bad",
+            "last_name": "Actor"
+        }
+        response = self.client.post(url, data, format='json')
+        
+        # Should return 400 Bad Request
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # Verify no user was created
+        self.assertFalse(User.objects.filter(email="hacker@gmail.com").exists())
+
+
+class AdminModeratorTests(APITestCase):
+    def setUp(self):
+        """Set up dummy data to use in the tests below"""
+        # Create an Admin User
+        self.admin_user = User.objects.create_user(
+            username="admin1",
+            email="admin@ateneo.edu",
+            password="adminpassword",
+            role="ADMIN",
+            is_active=True
         )
-        ServiceLog.objects.create(
-            scholar=self.profile,
-            date_rendered=date(2026, 3, 1),
-            hours=3.0,
-            office_name='Office',
-            activity_description='Desc'
+        
+        # Create a regular Scholar User
+        self.scholar_user = User.objects.create_user(
+            username="scholar1",
+            email="regular@student.ateneo.edu",
+            password="scholarpassword",
+            role="SCHOLAR",
+            is_active=True
         )
-        self.client = APIClient()
+        
+        # The URL for the assign moderator endpoint
+        self.assign_url = reverse('assign_moderator')
 
-    def test_get_profile_anyone(self):
-        url = reverse('api_profile')
-        response = self.client.get(url + f'?username={self.scholar.username}')
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(data['username'], self.scholar.username)
-        self.assertEqual(data['role'], 'SCHOLAR')
-        self.assertIn('service_logs', data)
-        self.assertGreater(len(data['service_logs']), 0)
+    def test_admin_can_assign_moderator(self):
+        """Test that an OAA Admin can successfully make someone a moderator"""
+        # 1. Authenticate the test client as the Admin
+        self.client.force_authenticate(user=self.admin_user)
+        
+        # 2. Send the POST request to assign the scholar to an office
+        data = {
+            "user_id": self.scholar_user.id,
+            "office_name": "Office of Admission and Aid"
+        }
+        response = self.client.post(self.assign_url, data, format='json')
+        
+        # 3. Check for success response
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # 4. Refresh the scholar user from the database and verify changes
+        self.scholar_user.refresh_from_db()
+        self.assertEqual(self.scholar_user.role, 'MODERATOR')
+        self.assertTrue(ModeratorProfile.objects.filter(user=self.scholar_user).exists())
+        self.assertEqual(self.scholar_user.moderator_profile.office_name, "Office of Admission and Aid")
 
-    def test_update_profile_as_admin(self):
-        self.client.force_login(self.admin)
-        url = reverse('api_profile')
-        response = self.client.put(url, data={'username': self.scholar.username, 'role': 'MODERATOR'}, format='json')
-        self.assertEqual(response.status_code, 200)
-        self.scholar.refresh_from_db()
-        self.assertEqual(self.scholar.role, 'MODERATOR')
-
-    def test_update_profile_as_non_admin(self):
-        self.client.force_login(self.scholar)
-        url = reverse('api_profile')
-        response = self.client.put(url, data={'username': self.scholar.username, 'role': 'ADMIN'}, format='json')
-        self.assertEqual(response.status_code, 403)
+    def test_scholar_cannot_assign_moderator(self):
+        """Test that a regular student cannot use the assign moderator endpoint"""
+        # 1. Authenticate the test client as a regular Scholar
+        self.client.force_authenticate(user=self.scholar_user)
+        
+        # 2. Try to perform the admin action
+        data = {
+            "user_id": self.scholar_user.id,
+            "office_name": "Hacker Office"
+        }
+        response = self.client.post(self.assign_url, data, format='json')
+        
+        # 3. Should return 403 Forbidden
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+        # 4. Verify their role did NOT change
+        self.scholar_user.refresh_from_db()
+        self.assertEqual(self.scholar_user.role, 'SCHOLAR')

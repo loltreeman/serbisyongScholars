@@ -1,6 +1,7 @@
 import threading
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
+from django.contrib.auth import login as django_login
 from django.contrib.auth.decorators import login_required
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -10,20 +11,20 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.http import HttpResponseForbidden
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
+from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.shortcuts import render
 from .serializers import RegistrationSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
-from .models import User, ScholarProfile, ServiceLog
+from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile
 from django.http import JsonResponse
-from .models import Announcement
+
 
 User = get_user_model()
-
 
 # Register a new user by default it is a scholar
 # -- SignUp View -- #
@@ -48,11 +49,11 @@ def send_confirmation_email(user):
     verification_link = f"{frontend_url}?uid={uid}&token={token}"
 
     # Send the email
-    subject = "Confirm your serbisyonScholar Account"
+    subject = "Confirm your serbisyongScholar Account"
     message = f"""
     Hi {user.first_name} {user.last_name},
 
-    Thank you for registering for an account on the Serbisyong Scholar Portal.
+    Thank you for registering for an account on the Serbisyong Scholar Portal. Your assigned username is: {user.username}
 
     Please click the link below to verify your email address and activate your account:
 
@@ -72,26 +73,62 @@ def send_confirmation_email(user):
     )
 
 # -- Verify Email View -- #
-@api_view(['POST'])
+@csrf_exempt
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
 def verify_email(request):
-    uidb64 = request.data.get('uid')
-    token = request.data.get('token')
-   
+    # Check both POST data and GET (URL) parameters
+    uidb64 = request.data.get('uid') or request.GET.get('uid')
+    token = request.data.get('token') or request.GET.get('token')
+    
+    if not uidb64 or not token:
+        return Response({'error': 'Missing credentials'}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
-    except:
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
     
     if user is not None and default_token_generator.check_token(user, token):
         user.is_active = True
         user.is_email_verified = True
         user.save()
-        return Response({'message': 'Email verified successfully.'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Email verified successfully! You can now login.'}, status=status.HTTP_200_OK)
     else:
-        return Response({'error': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST) 
-# Custom Token serializer/view to include user data in token response
+        return Response({'error': 'Invalid or expired verification link.'}, status=status.HTTP_400_BAD_REQUEST)
+    
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        # 1. Capture the input (which might be an email)
+        login_id = attrs.get(self.username_field)
+        password = attrs.get('password')
+
+        # 2. Check if the input is an email and map it to the real username
+        if login_id and '@' in login_id:
+            try:
+                user = User.objects.get(email__iexact=login_id)
+                attrs[self.username_field] = user.username
+            except User.DoesNotExist:
+                # If email not found, let the parent class handle the error
+                pass
+
+        # 3. Call the parent validate (which now has the correct username)
+        data = super().validate(attrs)
+
+        # 4. Add your custom user data to the response
+        data['user'] = {
+            'username': self.user.username,
+            'email': self.user.email,
+            'first_name': getattr(self.user, 'first_name', ''),
+            'last_name': getattr(self.user, 'last_name', ''),
+            'role': self.user.role,
+            'is_active': self.user.is_active,
+        }
+
+        return data
+    
     def validate(self, attrs):
         data = super().validate(attrs)
 
@@ -106,10 +143,64 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return data
 
-
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
 
+    def post(self, request, *args, **kwargs):
+        # 1. Get whatever they typed in the 'username' box
+        login_id = request.data.get('username') 
+        password = request.data.get('password')
+
+        # 2. If they typed an email, find the actual generated username
+        if login_id and '@' in login_id:
+            try:
+                user_obj = User.objects.get(email__iexact=login_id)
+                # Overwrite the 'username' in request data with the REAL username
+                request.data['username'] = user_obj.username
+            except User.DoesNotExist:
+                pass # Let authenticate handle the failure
+
+        # 3. Now call the standard JWT/Django login logic
+        response = super().post(request, *args, **kwargs)
+        
+        if response.status_code == 200:
+            from django.contrib.auth import authenticate
+            # Use the (potentially updated) username from request.data
+            user = authenticate(
+                username=request.data.get('username'),
+                password=password
+            )
+            if user:
+                django_login(request, user)
+                
+        return response
+
+    serializer_class = MyTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        # 1. First, let the JWT library do its job (generate tokens)
+        response = super().post(request, *args, **kwargs)
+        
+        if response.status_code == 200:
+            # 2. Extract credentials from request
+            username = request.data.get('username')
+            password = request.data.get('password')
+            
+            # 3. Use the Django authenticate system
+            from django.contrib.auth import authenticate
+            user = authenticate(username=username, password=password)
+            
+            if user is not None:
+                if user.is_active:
+                    django_login(request, user)
+                else:
+                    # This shouldn't happen if JWT gave a 200, but good for safety
+                    return Response({'error': 'Account is inactive.'}, status=status.HTTP_401_UNAUTHORIZED)
+            else:
+                # If JWT worked but authenticate failed, there's a backend config mismatch
+                print(f"Auth failed for user: {username}") 
+                
+        return response
 
 # -- Scholar Dashboard View -- #
 @api_view(['GET'])
@@ -167,13 +258,14 @@ def get_recent_announcements(request):
     
     return JsonResponse(data, safe=False)
 
-@login_required
+@login_required(login_url='/login/')
 def admin_dashboard_view(request):
-    """Render admin dashboard page; only accessible by admins."""
+    """Render admin dashboard page"""
+    # Check if user is admin
     if request.user.role != 'ADMIN':
-        return HttpResponseForbidden('Admin access required')
+        return HttpResponseForbidden("Admin access required")
+    
     return render(request, 'admin_dashboard.html')
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -244,6 +336,11 @@ def admin_scholars_list(request):
     completion_rate = (complete_count / total_scholars * 100) if total_scholars > 0 else 0
     average_hours = profiles.aggregate(Avg('total_hours_rendered'))['total_hours_rendered__avg'] or 0
     
+    # Get office statistics for charts
+    office_stats = ServiceLog.objects.values('office_name').annotate(
+        total_hours=Sum('hours')
+    ).order_by('-total_hours')[:5]  # Top 5 offices
+    
     return Response({
         'total': total_scholars,
         'complete': complete_count,
@@ -251,7 +348,8 @@ def admin_scholars_list(request):
         'behind': behind_count,
         'completion_rate': completion_rate,
         'average_hours': average_hours,
-        'scholars': scholars
+        'scholars': scholars,
+        'office_stats': list(office_stats) 
     })
 
 
@@ -337,6 +435,47 @@ def profile_page(request):
     """Render the profile HTML page."""
     return render(request, 'profile.html')
 
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def assign_moderator(request):
+    """
+    Render assign moderator page (GET) and assign moderator (POST)
+    API endpoint: /api/admin/assign-moderator/
+    Allows OAA (ADMIN) to assign moderator access to an office.
+    """
+    
+    # Check if user is admin
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin access required'}, status=403)
+
+    # Serve the HTML page when user opens the Assign link.
+    if request.method == 'GET':
+        return render(request, 'assign_moderator.html')
+    
+    # Get moderator username and office name from request
+    moderator_username = request.data.get('moderator_username')
+    office_name = request.data.get('office_name')
+    
+    if not moderator_username or not office_name:
+        return Response({'error': 'Moderator username and office name are required'}, status=400)
+    
+    # Find the user and update their status to moderator, and create/update their ModeratorProfile
+    try:
+        target_user = User.objects.get(username=moderator_username)
+        target_user.role = 'MODERATOR'
+        target_user.save()
+        
+        #Link them to the office by creating/updating their ModeratorProfile
+        ModeratorProfile.objects.update_or_create(
+            user=target_user,
+            defaults={'office_name': office_name}
+        )
+        return Response({'message': f'Moderator {moderator_username} assigned to {office_name}'})
+    except User.DoesNotExist:
+        return Response({'error': 'Moderator user not found'}, status=404)
+    except Exception as e:
+            return Response({'error': str(e)}, status=500)
+        
 # @api_view(['POST'])
 # @permission_classes([AllowAny])
 # def login(request):
