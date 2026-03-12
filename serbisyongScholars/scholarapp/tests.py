@@ -21,8 +21,8 @@ class AdminDashboardTests(TestCase):
             role='ADMIN',
             is_email_verified=True
         )
-        
-        # Create test scholars
+
+        # create test scholars
         for i in range(5):
             user = User.objects.create_user(
                 username=f'scholar{i}',
@@ -33,7 +33,7 @@ class AdminDashboardTests(TestCase):
                 last_name='TestUser',
                 is_email_verified=True
             )
-            
+
             profile = ScholarProfile.objects.create(
                 user=user,
                 student_id=f'12345{i}',
@@ -42,8 +42,7 @@ class AdminDashboardTests(TestCase):
                 is_dormer=(i % 2 == 0),
                 required_hours=25.0 if (i % 2 == 0) else 15.0
             )
-            
-            # Add some service hours
+
             hours = 10.0 if i < 3 else 5.0
             ServiceLog.objects.create(
                 scholar=profile,
@@ -52,8 +51,6 @@ class AdminDashboardTests(TestCase):
                 office_name='Test Office',
                 activity_description='Test activity'
             )
-            
-            # Update rendered hours
             profile.total_hours_rendered = hours
             profile.save()
         
@@ -63,19 +60,13 @@ class AdminDashboardTests(TestCase):
         self.api_client = APIClient()
     
     def test_admin_dashboard_page_loads(self):
-        """Test if admin dashboard page renders successfully"""
-        # Login as admin
         self.client.force_login(self.admin)
-        
-        # Access admin dashboard
         url = reverse('admin_dashboard')
         response = self.client.get(url)
-        
-        # Should return 200 now
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Admin Dashboard')
         self.assertContains(response, 'Total Scholars')
-    
+
     def test_admin_dashboard_shows_correct_stats(self):
         """Test if dashboard shows correct scholar statistics"""
         self.api_client.force_authenticate(user=self.admin)
@@ -86,17 +77,12 @@ class AdminDashboardTests(TestCase):
         
         # Should return 200 now
         self.assertEqual(response.status_code, 200)
-        
         data = response.json()
-        
-        # Check total scholars (should be 5)
         self.assertEqual(data['total'], 5)
-        
-        # Check that stats are present
         self.assertIn('complete', data)
         self.assertIn('behind', data)
         self.assertIn('average_hours', data)
-    
+
     def test_scholar_filtering_by_status(self):
         """Test if filtering by completion status works"""
         self.api_client.force_authenticate(user=self.admin)
@@ -108,12 +94,10 @@ class AdminDashboardTests(TestCase):
         # Check if response is JSON
         if response.status_code == 200:
             data = response.json()
-            
-            # All returned scholars should be complete
             for scholar in data['scholars']:
                 percentage = (scholar['rendered_hours'] / scholar['required_hours']) * 100
                 self.assertGreaterEqual(percentage, 100)
-    
+
     def test_scholar_search_functionality(self):
         """Test if search by student ID works"""
         self.api_client.force_authenticate(user=self.admin)
@@ -124,11 +108,9 @@ class AdminDashboardTests(TestCase):
         # Check if response is JSON
         if response.status_code == 200:
             data = response.json()
-            
-            # Should find the scholar
             self.assertGreater(len(data['scholars']), 0)
             self.assertEqual(data['scholars'][0]['student_id'], '123450')
-    
+
     def test_admin_dashboard_requires_auth(self):
         """Test if dashboard requires authentication"""
         # Try to access without login - use regular client
@@ -137,13 +119,12 @@ class AdminDashboardTests(TestCase):
         
         # Should redirect to login (302)
         self.assertEqual(response.status_code, 302)
-    
+
     def test_admin_dashboard_requires_admin_role(self):
         """Test if non-admin users are blocked"""
         # Login as scholar (not admin) - use regular client
         scholar = User.objects.filter(role='SCHOLAR').first()
         self.client.force_login(scholar)
-        
         url = reverse('admin_dashboard')
         response = self.client.get(url)
         

@@ -215,20 +215,27 @@ def get_scholar_dashboard(request):
         scholar = user.scholar_profile
         service_logs = ServiceLog.objects.filter(scholar=scholar)
 
+            # reuse shape for profile
         return Response({
-            'student_id': scholar.student_id,
+            'username': user.username,
             'name': f"{user.first_name} {user.last_name}",
-            'program': scholar.program_course,
-            'is_dormer': scholar.is_dormer,
-            'required_hours': scholar.required_hours,
-            'rendered_hours': scholar.total_hours_rendered,
-            'carry_over': scholar.carry_over_hours,
+            'email': user.email,
+            'role': user.role,
+            'student_id': getattr(scholar, 'student_id', None),
+            'program': getattr(scholar, 'program_course', None),
+            'grant_type': getattr(scholar, 'scholar_grant', None),
+            'is_dormer': getattr(scholar, 'is_dormer', None),
+            'required_hours': getattr(scholar, 'required_hours', None),
+            'rendered_hours': getattr(scholar, 'total_hours_rendered', None),
+            'carry_over': getattr(scholar, 'carry_over_hours', None),
             'service_logs': [
                 {
                     'date': log.date_rendered,
                     'hours': log.hours,
                     'office': log.office_name,
-                    'activity': log.activity_description
+                    'activity': log.activity_description,
+                    # assume all logs are approved currently
+                    'status': 'Approved'
                 }
                 for log in service_logs
             ]
@@ -344,6 +351,89 @@ def admin_scholars_list(request):
         'scholars': scholars,
         'office_stats': list(office_stats) 
     })
+
+
+# --- Profile API and page ---
+@api_view(['GET', 'PUT'])
+@permission_classes([AllowAny])
+def user_profile(request):
+    """Retrieve or update a user's profile information.
+
+    GET parameters:
+        username - required, identifies the user whose profile is requested.
+
+    PUT body (JSON):
+        username (required) and any of the editable fields. Only admins may
+        change the ``role`` field; users may update their own ``first_name``
+        and ``last_name``. Other fields may be ignored or validated.
+    """
+    username = request.GET.get('username') if request.method == 'GET' else request.data.get('username')
+    if not username:
+        return Response({'error': 'Please provide a username.'}, status=400)
+
+    try:
+        user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+
+    scholar = getattr(user, 'scholar_profile', None)
+
+    if request.method == 'GET':
+        data = {
+            'username': user.username,
+            'name': f"{user.first_name} {user.last_name}",
+            'email': user.email,
+            'role': user.role,
+            'student_id': getattr(scholar, 'student_id', None),
+            'course_department': getattr(scholar, 'program_course', None),
+            'grant_type': getattr(scholar, 'scholar_grant', None),
+            'service_logs': []
+        }
+        if scholar:
+            logs = ServiceLog.objects.filter(scholar=scholar)
+            data['service_logs'] = [
+                {
+                    'date': log.date_rendered,
+                    'hours': log.hours,
+                    'office': log.office_name,
+                    'activity': log.activity_description,
+                    'status': 'Approved',
+                }
+                for log in logs
+            ]
+        return Response(data)
+
+    # PUT: update profile
+    if not request.user.is_authenticated:
+        return Response({'error': 'Authentication required to update profile.'}, status=401)
+
+    # Only admin can change role, or user can update their own name
+    payload = request.data
+    updated = False
+    if 'role' in payload:
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin access required to change role.'}, status=403)
+        new_role = payload.get('role')
+        if new_role in dict(User.ROLE_CHOICES):
+            user.role = new_role
+            updated = True
+    if 'first_name' in payload and request.user == user:
+        user.first_name = payload.get('first_name')
+        updated = True
+    if 'last_name' in payload and request.user == user:
+        user.last_name = payload.get('last_name')
+        updated = True
+
+    if updated:
+        user.save()
+        return Response({'message': 'Profile updated successfully.'})
+    else:
+        return Response({'message': 'No changes made.'}, status=400)
+
+
+def profile_page(request):
+    """Render the profile HTML page."""
+    return render(request, 'profile.html')
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])

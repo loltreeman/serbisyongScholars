@@ -1,0 +1,46 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>serbisyongScholar Profile</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    </head>
+    <body class="bg-slate-50 text-slate-800 mb-20 md:mb-0">
+        <nav class="bg-[#1e3a8a] text-white shadow-md px-6 py-4">
+            <div class="max-w-7xl mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-[#fbbf24] rounded-full flex items-center justify-center font-bold text-[#1e3a8a]">S</div>
+                    <span class="text-xl font-bold tracking-tight">serbisyongScholar</span>
+                </div>
+
+                <div class="hidden md:flex items-center gap-6">
+                    <a href="/dashboard" class="hover:bg-white/10 px-3 py-2 rounded-md text-sm transition">📊 Dashboard</a>
+                    <a href="/profile" class="bg-white/20 px-3 py-2 rounded-md font-semibold text-sm">👤 Profile</a>
+                    <a href="/announcements" class="hover:bg-white/10 px-3 py-2 rounded-md text-sm transition">📢 Announcements</a>
+                    <a href="/vouchers" class="hover:bg-white/10 px-3 py-2 rounded-md text-sm transition">🎟️ Vouchers</a>
+                    <button id="logout" class="bg-slate-100 text-slate-700 hover:bg-white px-4 py-2 rounded-lg font-semibold text-sm transition">Logout</button>
+                </div>
+
+                <button id="logout-mobile" class="md:hidden bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-semibold text-sm">Logout</button>
+            </div>
+        </nav>
+
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-8 h-8 text-slate-600 bg-slate-200 rounded p-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+                <h1 class="text-3xl font-bold text-slate-900 tracking-tight">User Profile</h1>
+            </div>
+
+            <div id="profile-container" class="space-y-6">
+                <!-- user details will be injected here by JS -->
+            </div>
+        </div>
+
+        <script src="{% static 'js/profile.js' %}"></script>
+    </body>
+</html>
