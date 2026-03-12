@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
-from .models import User, ScholarProfile
+from .models import User, ScholarProfile, ServiceLog
+from datetime import date
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -99,3 +100,37 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role']
+
+class ServiceLogSerializer(serializers.ModelSerializer):
+    student_id = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = ServiceLog
+        fields = ['student_id', 'date_rendered', 'hours', 'office_name', 'activity_description']
+
+    def validate_date_rendered(self, value):
+        if value > date.today():
+            raise serializers.ValidationError("Date cannot be in the future.")
+        return value
+
+    def validate_hours(self, value):
+        if value < 0.5:
+            raise serializers.ValidationError("Minimum loggable hours is 0.5.")
+        if value > 24:
+            raise serializers.ValidationError("A single log cannot exceed 24 hours.")
+        return value
+
+    def validate_student_id(self, value):
+        if not ScholarProfile.objects.filter(student_id=value).exists():
+            raise serializers.ValidationError("No scholar found with that student ID.")
+        return value
+    
+    # creating the service hours log
+    def create(self, validated_data):
+        student_id = validated_data.pop('student_id')
+        scholar = ScholarProfile.objects.get(student_id=student_id)
+        return ServiceLog.objects.create(
+            scholar=scholar,
+            created_by=self.context['request'].user,
+            **validated_data
+        )

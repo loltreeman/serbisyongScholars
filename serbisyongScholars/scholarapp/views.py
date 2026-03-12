@@ -14,7 +14,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.shortcuts import render
-from .serializers import RegistrationSerializer
+from .serializers import RegistrationSerializer, ServiceLogSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -385,7 +385,26 @@ def assign_moderator(request):
         return Response({'error': 'Moderator user not found'}, status=404)
     except Exception as e:
             return Response({'error': str(e)}, status=500)
-        
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_service_log(request):
+
+    # Checks if user is either ADMIN or MOD, the only people allowed to encode
+    if request.user.role not in ['ADMIN', 'MODERATOR']:
+        return Response(
+            {'error': 'Only admins and moderators can create service logs.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    serializer = ServiceLogSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {'message': 'Service log created successfully.'},
+            status=status.HTTP_201_CREATED
+        )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 # @api_view(['POST'])
 # @permission_classes([AllowAny])
 # def login(request):

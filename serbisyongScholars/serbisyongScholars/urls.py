@@ -26,4 +26,7 @@ urlpatterns = [
     path('dashboard/', TemplateView.as_view(template_name='dashboard.html'), name='dashboard'),
     path('verify/', TemplateView.as_view(template_name='verify.html'), name='verify'),
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
+    path('encode/', TemplateView.as_view(template_name='add_log.html'), name='add_log'),
+
+
 ]
