@@ -54,11 +54,18 @@ class ScholarProfile(models.Model):
         return f"{self.student_id} - {self.user.username}"
     
     def save(self, *args, **kwargs):
-        # Set the hours based on dormer status
+        
+        # Dormer logic
         if self.is_dormer:
             self.required_hours = 15.0
         else:
             self.required_hours = 10.0
+
+        # Carry over calculation
+        if ((self.total_hours_rendered-self.required_hours) >= 0):
+            self.carry_over_hours = self.total_hours_rendered-self.required_hours
+        else: 
+            self.carry_over_hours = 0
             
         super().save(*args, **kwargs)
 
