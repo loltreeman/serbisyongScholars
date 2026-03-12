@@ -30,7 +30,7 @@ class ScholarProfile(models.Model):
     is_dormer = models.BooleanField(default=False)
    
     # Service hours
-    required_hours = models.FloatField(default=15.0, validators=[MinValueValidator(0.0)])
+    required_hours = models.FloatField(validators=[MinValueValidator(0.0)], blank=True)
     total_hours_rendered = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
     carry_over_hours = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
 
@@ -52,6 +52,15 @@ class ScholarProfile(models.Model):
 
     def __str__(self):
         return f"{self.student_id} - {self.user.username}"
+    
+    def save(self, *args, **kwargs):
+        # Set the hours based on dormer status
+        if self.is_dormer:
+            self.required_hours = 15.0
+        else:
+            self.required_hours = 10.0
+            
+        super().save(*args, **kwargs)
 
 class ModeratorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='moderator_profile')
