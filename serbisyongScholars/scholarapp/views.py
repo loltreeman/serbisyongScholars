@@ -26,6 +26,25 @@ from django.http import JsonResponse
 
 User = get_user_model()
 
+
+def get_available_offices():
+    offices = {
+        office_name.strip()
+        for office_name in ServiceLog.objects.exclude(office_name__isnull=True)
+        .exclude(office_name__exact='')
+        .values_list('office_name', flat=True)
+        if office_name and office_name.strip()
+    }
+    offices.update(
+        office_name.strip()
+        for office_name in ModeratorProfile.objects.exclude(office_name__isnull=True)
+        .exclude(office_name__exact='')
+        .values_list('office_name', flat=True)
+        if office_name and office_name.strip()
+    )
+    offices.add('Office of Admission and Aid')
+    return sorted(offices, key=str.casefold)
+
 # Register a new user by default it is a scholar
 # -- SignUp View -- #
 @api_view(['POST'])
@@ -474,11 +493,13 @@ def assign_moderator(request):
 
     # Serve the HTML page when user opens the Assign link.
     if request.method == 'GET':
-        return render(request, 'assign_moderator.html')
+        return render(request, 'assign_moderator.html', {
+            'office_choices': get_available_offices(),
+        })
     
     # Get moderator username and office name from request
     moderator_username = request.data.get('moderator_username')
-    office_name = request.data.get('office_name')
+    office_name = (request.data.get('office_name') or '').strip()
     
     if not moderator_username or not office_name:
         return Response({'error': 'Moderator username and office name are required'}, status=400)
@@ -524,89 +545,3 @@ def create_service_log(request):
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# @api_view(['POST'])
-# @permission_classes([AllowAny])
-# def login(request):
-#     username = request.data.get('username')
-#     password = request.data.get('password')
-    
-#     # This just checks if the username and password match the database
-#     user = authenticate(username=username, password=password)
-    
-#     if user:
-#         return Response({
-#             'message': 'Login successful!',
-#             'user': {
-#                 'username': user.username,
-#                 'email': user.email,
-#             }
-#         })
-    
-#     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
-# if not username:
-#         return Response({'error': 'Please provide a username in the URL'}, status=400)
-
-#     try:
-#         user = User.objects.get(username=username)
-#         scholar = user.scholar_profile
-#         service_logs = ServiceLog.objects.filter(scholar=scholar)
-        
-#         return Response({
-#             'student_id': scholar.student_id,
-#             'name': f"{user.first_name} {user.last_name}",
-#             'program': scholar.program_course,
-#             'is_dormer': scholar.is_dormer,
-#             'required_hours': scholar.required_hours,
-#             'rendered_hours': scholar.total_hours_rendered,
-#             'carry_over': scholar.carry_over_hours,
-#             'service_logs': [
-#                 {
-#                     'date': log.date_rendered,
-#                     'hours': log.hours,
-#                     'office': log.office_name,
-#                     'activity': log.activity_description
-#                 }
-#                 for log in service_logs
-#             ]
-#         })
-#     except User.DoesNotExist:
-#         return Response({'error': 'User not found'}, status=404)
-#     except ScholarProfile.DoesNotExist:
-#         return Response({'error': 'Scholar profile not found for this user'}, status=404)# @api_view(['GET'])
-# @permission_classes([AllowAny]) # Changed to AllowAny
-# def get_scholar_dashboard(request):
-#     # Because there is no authentication, Django doesn't know who "request.user" is.
-#     # We have to pass the username in the URL to know whose dashboard to load.
-#     username = request.GET.get('username')
-    
-#     if not username:
-#         return Response({'error': 'Please provide a username in the URL'}, status=400)
-
-#     try:
-#         user = User.objects.get(username=username)
-#         scholar = user.scholar_profile
-#         service_logs = ServiceLog.objects.filter(scholar=scholar)
-        
-#         return Response({
-#             'student_id': scholar.student_id,
-#             'name': f"{user.first_name} {user.last_name}",
-#             'program': scholar.program_course,
-#             'is_dormer': scholar.is_dormer,
-#             'required_hours': scholar.required_hours,
-#             'rendered_hours': scholar.total_hours_rendered,
-#             'carry_over': scholar.carry_over_hours,
-#             'service_logs': [
-#                 {
-#                     'date': log.date_rendered,
-#                     'hours': log.hours,
-#                     'office': log.office_name,
-#                     'activity': log.activity_description
-#                 }
-#                 for log in service_logs
-#             ]
-#         })
-#     except User.DoesNotExist:
-#         return Response({'error': 'User not found'}, status=404)
-#     except ScholarProfile.DoesNotExist:
-#         return Response({'error': 'Scholar profile not found for this user'}, status=404)

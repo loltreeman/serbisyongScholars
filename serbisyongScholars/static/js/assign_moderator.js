@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!officeName) {
-            showMessage('Please enter an office name.', false);
+            showMessage('Please select an office.', false);
             return;
         }
 

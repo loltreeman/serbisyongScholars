@@ -319,6 +319,26 @@ class AdminModeratorTests(APITestCase):
         # The URL for the assign moderator endpoint
         self.assign_url = reverse('assign_moderator')
 
+        ServiceLog.objects.create(
+            scholar=ScholarProfile.objects.create(
+                user=User.objects.create_user(
+                    username="scholar2",
+                    email="second@student.ateneo.edu",
+                    password="scholarpassword",
+                    role="SCHOLAR",
+                    is_active=True
+                ),
+                student_id="654321",
+                program_course="",
+                scholar_grant="",
+            ),
+            date_rendered=date.today(),
+            hours=1,
+            office_name='Rizal Library',
+            activity_description='Shelving books',
+            created_by=self.admin_user,
+        )
+
     def test_admin_can_assign_moderator(self):
         """Test that an OAA Admin can successfully make someone a moderator"""
         # 1. Authenticate the test client as the Admin
@@ -326,7 +346,7 @@ class AdminModeratorTests(APITestCase):
         
         # 2. Send the POST request to assign the scholar to an office
         data = {
-            "user_id": self.scholar_user.id,
+            "moderator_username": self.scholar_user.username,
             "office_name": "Office of Admission and Aid"
         }
         response = self.client.post(self.assign_url, data, format='json')
@@ -347,7 +367,7 @@ class AdminModeratorTests(APITestCase):
         
         # 2. Try to perform the admin action
         data = {
-            "user_id": self.scholar_user.id,
+            "moderator_username": self.scholar_user.username,
             "office_name": "Hacker Office"
         }
         response = self.client.post(self.assign_url, data, format='json')
@@ -358,3 +378,13 @@ class AdminModeratorTests(APITestCase):
         # 4. Verify their role did NOT change
         self.scholar_user.refresh_from_db()
         self.assertEqual(self.scholar_user.role, 'SCHOLAR')
+
+    def test_assign_moderator_page_includes_office_choices(self):
+        """Test that the assign moderator page shows dropdown office choices."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        response = self.client.get(self.assign_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, '<option value="Rizal Library">Rizal Library</option>', html=True)
+        self.assertContains(response, '<option value="Office of Admission and Aid">Office of Admission and Aid</option>', html=True)
