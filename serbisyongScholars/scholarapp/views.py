@@ -486,6 +486,11 @@ def assign_moderator(request):
     # Find the user and update their status to moderator, and create/update their ModeratorProfile
     try:
         target_user = User.objects.get(username=moderator_username)
+
+        # Prevent duplicate moderator assignment.
+        if target_user.role == 'MODERATOR':
+            return Response({'error': f'User {moderator_username} is already a moderator.'}, status=400)
+
         target_user.role = 'MODERATOR'
         target_user.save()
         
