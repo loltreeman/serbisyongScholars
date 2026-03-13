@@ -435,6 +435,30 @@ def profile_page(request):
     """Render the profile HTML page."""
     return render(request, 'profile.html')
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_users(request):
+    """
+    Search users by username, first name, or last name.
+    Returns a list of matching users with basic info.
+    Query param: ?q=<search term>
+    """
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin access required'}, status=403)
+
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return Response([], status=200)
+
+    users = User.objects.filter(
+        Q(username__icontains=query) |
+        Q(first_name__icontains=query) |
+        Q(last_name__icontains=query)
+    ).exclude(role='ADMIN').values('username', 'first_name', 'last_name', 'email', 'role')[:10]
+
+    return Response(list(users), status=200)
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def assign_moderator(request):

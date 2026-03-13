@@ -13,6 +13,7 @@ urlpatterns = [
     path('profile/', views.user_profile, name='api_profile'),
     path('announcements/', views.get_recent_announcements, name='api_announcements'),
     path('admin/assign-moderator/', views.assign_moderator, name='assign_moderator'),
+    path('admin/search-users/', views.search_users, name='search_users'),
     path('logs/create/', views.create_service_log, name='api_create_log'),
 
 ]
