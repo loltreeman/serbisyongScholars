@@ -28,4 +28,7 @@ urlpatterns = [
     path('verify/', TemplateView.as_view(template_name='verify.html'), name='verify'),
     path('profile/', scholar_views.profile_page, name='profile'),
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
+    path('encode/', TemplateView.as_view(template_name='add_log.html'), name='add_log'),
+
+
 ]
