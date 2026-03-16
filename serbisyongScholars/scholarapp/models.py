@@ -128,6 +128,7 @@ class Announcement(models.Model):
         ('URGENT', 'Urgent'),
         ('VOLUNTEER', 'Volunteer Work'),
         ('OPPORTUNITY', 'Scholarship Opportunity'),
+        ('FOOD STUBS', 'Food Stubs'),
     ]
 
     title = models.CharField(max_length=255)
