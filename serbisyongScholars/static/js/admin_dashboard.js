@@ -235,125 +235,144 @@ function showError(message) {
     `;
 }
 
+/**
+ * Create charts
+ */
 function createCharts(data) {
+    // Destroy existing charts if they exist
     if (window.distributionChart) window.distributionChart.destroy();
     if (window.officeChart) window.officeChart.destroy();
+    if (window.dormerChart) window.dormerChart.destroy();
 
-    const distributionCtx = document.getElementById("distribution-chart");
+    const distributionCtx = document.getElementById('distribution-chart');
     if (distributionCtx) {
         window.distributionChart = new Chart(distributionCtx, {
-            type: "doughnut",
+            type: 'doughnut',
             data: {
-                labels: ["Complete", "On Track", "Behind"],
-                datasets: [
-                    {
-                        data: [
-                            data.complete || 0,
-                            data.on_track || 0,
-                            data.behind || 0,
-                        ],
-                        backgroundColor: ["#10b981", "#f59e0b", "#ef4444"],
-                        borderWidth: 0,
-                    },
-                ],
+                labels: ['Complete', 'On Track', 'Behind'],
+                datasets: [{
+                    data: [data.complete || 0, data.on_track || 0, data.behind || 0],
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                    borderWidth: 0
+                }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false, 
                 plugins: {
                     legend: {
-                        position: "bottom",
+                        position: 'bottom',
                         labels: {
-                            padding: 15,
-                            font: {
-                                size: 12,
-                            },
-                        },
+                            padding: 10,
+                            font: { size: 11 },
+                            boxWidth: 12
+                        }
                     },
                     tooltip: {
                         callbacks: {
-                            label: function (context) {
-                                const label = context.label || "";
+                            label: function(context) {
+                                const label = context.label || '';
                                 const value = context.parsed || 0;
                                 const total = data.total || 1;
-                                const percentage = (
-                                    (value / total) *
-                                    100
-                                ).toFixed(1);
+                                const percentage = ((value / total) * 100).toFixed(1);
                                 return `${label}: ${value} (${percentage}%)`;
-                            },
-                        },
-                    },
-                },
-            },
+                            }
+                        }
+                    }
+                }
+            }
         });
     }
-
-    const officeCtx = document.getElementById("office-chart");
-    if (officeCtx && data.office_stats) {
-        const officeNames = data.office_stats.map((stat) => stat.office_name);
-        const officeHours = data.office_stats.map((stat) => stat.total_hours);
-
-        window.officeChart = new Chart(officeCtx, {
-            type: "bar", 
+    
+    const dormerCtx = document.getElementById('dormer-chart');
+    if (dormerCtx) {
+        window.dormerChart = new Chart(dormerCtx, {
+            type: 'doughnut',
             data: {
-                labels: officeNames,
-                datasets: [
-                    {
-                        label: "Total Hours",
-                        data: officeHours,
-                        backgroundColor: "#3b82f6",
-                        borderRadius: 6,
-                    },
-                ],
+                labels: ['Dormers (15hrs)', 'Non-Dormers (10hrs)'],
+                datasets: [{
+                    data: [data.dormer_count || 0, data.non_dormer_count || 0],
+                    backgroundColor: ['#3b82f6', '#10b981'],
+                    borderWidth: 0
+                }]
             },
             options: {
-                indexAxis: "y", 
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,  
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 10,
+                            font: { size: 11 },
+                            boxWidth: 12
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = (data.dormer_count || 0) + (data.non_dormer_count || 0);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    const officeCtx = document.getElementById('office-chart');
+    if (officeCtx && data.office_stats) {
+        const officeNames = data.office_stats.map(stat => stat.office_name);
+        const officeHours = data.office_stats.map(stat => stat.total_hours);
+        
+        window.officeChart = new Chart(officeCtx, {
+            type: 'bar',
+            data: {
+                labels: officeNames,
+                datasets: [{
+                    label: 'Total Hours',
+                    data: officeHours,
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',  
+                responsive: true,
+                maintainAspectRatio: false,  
                 plugins: {
                     legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.parsed.x} hours`;
+                            }
+                        }
+                    }
                 },
                 scales: {
                     x: {
                         beginAtZero: true,
                         ticks: {
-                            callback: function (value) {
-                                return value + "h";
+                            callback: function(value) {
+                                return value + 'h';
                             },
+                            font: { size: 11 }
                         },
+                        grid: { color: '#e5e7eb' }
                     },
                     y: {
                         grid: { display: false },
-                    },
-                },
-            },
+                        ticks: {
+                            font: { size: 11 }
+                        }
+                    }
+                }
+            }
         });
-
-        const dormerCtx = document.getElementById("dormer-chart");
-        if (dormerCtx) {
-            new Chart(dormerCtx, {
-                type: "doughnut",
-                data: {
-                    labels: ["Dormers (15hrs)", "Non-Dormers (10hrs)"],
-                    datasets: [
-                        {
-                            data: [
-                                data.dormer_count || 0,
-                                data.non_dormer_count || 0,
-                            ],
-                            backgroundColor: ["#3b82f6", "#10b981"],
-                            borderWidth: 0,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: "bottom" },
-                    },
-                },
-            });
-        }
     }
 }

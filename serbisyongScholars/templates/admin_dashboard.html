@@ -1,211 +1,344 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - serbisyongScholar</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>  <!-- ← ADD THIS -->
-    <link rel="stylesheet" href="{% static 'css/progress.css' %}">
-</head>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Admin Dashboard - serbisyongScholar</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <link rel="stylesheet" href="{% static 'css/progress.css' %}" />
+    </head>
 
-<body class="bg-gray-50">
-    
-    {% include 'partials/navbar.html' %}
-    
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p class="text-gray-600">Service Hour Overview • Academic Year 2025-2026</p>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-                <div class="flex items-center justify-between">
+    <body class="bg-gray-50">
+        {% include 'partials/navbar.html' %}
+
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900">
+                    Admin Dashboard
+                </h1>
+                <p class="text-gray-600">
+                    Service Hour Overview • Academic Year 2025-2026
+                </p>
+            </div>
+
+            <div
+                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+            >
+                <div
+                    class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500"
+                >
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">
+                                Total Scholars
+                            </p>
+                            <p
+                                class="text-3xl font-bold text-gray-900"
+                                id="stat-total"
+                            >
+                                0
+                            </p>
+                        </div>
+                        <div class="bg-blue-100 rounded-full p-3">
+                            <svg
+                                class="w-8 h-8 text-blue-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                                />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500"
+                >
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">
+                                Completion Rate
+                            </p>
+                            <p
+                                class="text-3xl font-bold text-green-600"
+                                id="stat-completion"
+                            >
+                                0%
+                            </p>
+                        </div>
+                        <div class="bg-green-100 rounded-full p-3">
+                            <svg
+                                class="w-8 h-8 text-green-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500"
+                >
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">
+                                Behind Schedule
+                            </p>
+                            <p
+                                class="text-3xl font-bold text-red-600"
+                                id="stat-behind"
+                            >
+                                0
+                            </p>
+                        </div>
+                        <div class="bg-red-100 rounded-full p-3">
+                            <svg
+                                class="w-8 h-8 text-red-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500"
+                >
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">
+                                Average Hours
+                            </p>
+                            <p
+                                class="text-3xl font-bold text-purple-600"
+                                id="stat-average"
+                            >
+                                0h
+                            </p>
+                        </div>
+                        <div class="bg-purple-100 rounded-full p-3">
+                            <svg
+                                class="w-8 h-8 text-purple-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                                />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div
+                    class="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+                >
+                    <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+                        <span class="mr-2">📊</span> Scholar Status Distribution
+                    </h3>
+                    <div class="relative" style="height: 280px">
+                        <canvas id="distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+                >
+                    <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+                        <span class="mr-2">🏠</span> Dormer Status Distribution
+                    </h3>
+                    <div class="relative" style="height: 280px">
+                        <canvas id="dormer-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div
+                class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8"
+            >
+                <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+                    <span class="mr-2">📈</span> Service Hours by Office
+                </h3>
+                <div class="relative" style="height: 320px">
+                    <canvas id="office-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-lg font-semibold mb-4">Filters</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <p class="text-gray-500 text-sm font-medium">Total Scholars</p>
-                        <p class="text-3xl font-bold text-gray-900" id="stat-total">0</p>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-2"
+                            >Status</label
+                        >
+                        <select
+                            id="filter-status"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="all">All Status</option>
+                            <option value="complete">Complete</option>
+                            <option value="on-track">On Track</option>
+                            <option value="behind">Behind</option>
+                        </select>
                     </div>
-                    <div class="bg-blue-100 rounded-full p-3">
-                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                <div class="flex items-center justify-between">
+
                     <div>
-                        <p class="text-gray-500 text-sm font-medium">Completion Rate</p>
-                        <p class="text-3xl font-bold text-green-600" id="stat-completion">0%</p>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-2"
+                            >School</label
+                        >
+                        <select
+                            id="filter-school"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="all">All Schools</option>
+                            <option value="SOSE">SOSE</option>
+                            <option value="SOH">SOH</option>
+                            <option value="JGSOM">JGSOM</option>
+                            <option value="RGLSOSS">RGLSOSS</option>
+                            <option value="GBSEALD">GBSEALD</option>
+                        </select>
                     </div>
-                    <div class="bg-green-100 rounded-full p-3">
-                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
-                <div class="flex items-center justify-between">
+
                     <div>
-                        <p class="text-gray-500 text-sm font-medium">Behind Schedule</p>
-                        <p class="text-3xl font-bold text-red-600" id="stat-behind">0</p>
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-2"
+                            >Search</label
+                        >
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="Name or Student ID..."
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                        />
                     </div>
-                    <div class="bg-red-100 rounded-full p-3">
-                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm font-medium">Average Hours</p>
-                        <p class="text-3xl font-bold text-purple-600" id="stat-average">0h</p>
-                    </div>
-                    <div class="bg-purple-100 rounded-full p-3">
-                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
+
+                    <div class="flex items-end">
+                        <button
+                            onclick="applyFilters()"
+                            class="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold"
+                        >
+                            Apply Filters
+                        </button>
                     </div>
                 </div>
             </div>
-        </div>
 
-
-        <!-- Charts Section: 2 Rows -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    
-    <!-- Row 1: Scholar Status Distribution -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 class="text-gray-800 font-bold mb-4 flex items-center">
-            <span class="mr-2">📊</span> Scholar Status Distribution
-        </h3>
-        <div class="relative h-64">
-            <canvas id="distribution-chart"></canvas>
-        </div>
-    </div>
-    
-    <!-- Row 1: Dormer Status Distribution -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 class="text-gray-800 font-bold mb-4 flex items-center">
-            <span class="mr-2">🏠</span> Dormer Status Distribution
-        </h3>
-        <div class="relative h-64">
-            <canvas id="dormer-chart"></canvas>
-        </div>
-    </div>
-    
-</div>
-
-<!-- Row 2: Service Hours by Office (Full Width) -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-    <h3 class="text-gray-800 font-bold mb-4 flex items-center">
-        <span class="mr-2">📈</span> Service Hours by Office
-    </h3>
-    <div class="relative h-80">
-        <canvas id="office-chart"></canvas>
-    </div>
-</div>
-                
-        
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-lg font-semibold mb-4">Filters</h2>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <select id="filter-status" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
-                        <option value="all">All Status</option>
-                        <option value="complete">Complete</option>
-                        <option value="on-track">On Track</option>
-                        <option value="behind">Behind</option>
-                    </select>
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold">All Scholars</h2>
+                    <p class="text-sm text-gray-500">
+                        Last updated: <span id="last-updated">Never</span>
+                    </p>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">School</label>
-                    <select id="filter-school" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
-                        <option value="all">All Schools</option>
-                        <option value="SOSE">SOSE</option>
-                        <option value="SOH">SOH</option>
-                        <option value="JGSOM">JGSOM</option>
-                        <option value="RGLSOSS">RGLSOSS</option>
-                        <option value="GBSEALD">GBSEALD</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
-                    <input type="text" id="search-input" placeholder="Name or Student ID..." 
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
-                </div>
-                
-                <div class="flex items-end">
-                    <button onclick="applyFilters()" 
-                            class="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold">
-                        Apply Filters
-                    </button>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Student ID
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Name
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Program
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Progress
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Hours
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Status
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody
+                            id="scholar-table"
+                            class="bg-white divide-y divide-gray-200"
+                        >
+                            <tr>
+                                <td
+                                    colspan="7"
+                                    class="px-6 py-12 text-center text-gray-500"
+                                >
+                                    <div class="flex flex-col items-center">
+                                        <svg
+                                            class="w-12 h-12 text-gray-400 mb-4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                                            />
+                                        </svg>
+                                        <p class="text-lg font-medium">
+                                            Loading scholars...
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-        
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold">All Scholars</h2>
-                <p class="text-sm text-gray-500">Last updated: <span id="last-updated">Never</span></p>
-            </div>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Student ID
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Name
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Program
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Progress
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Hours
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Status
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="scholar-table" class="bg-white divide-y divide-gray-200">
-                        <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                                <div class="flex flex-col items-center">
-                                    <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                    </svg>
-                                    <p class="text-lg font-medium">Loading scholars...</p>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
-    <script src="{% static 'js/admin_dashboard.js' %}"></script>
-    <script src="{% static 'js/progress.js' %}"></script>
-</body>
+        <script src="{% static 'js/admin_dashboard.js' %}"></script>
+        <script src="{% static 'js/progress.js' %}"></script>
+    </body>
 </html>

@@ -32,14 +32,13 @@ async function load() {
                     '<div class="empty-state">User profile not found.</div>';
             } else {
                 logsContainer.innerHTML =
-                    '<div class="empty-state">⚠️ Failed to load dashboard.</div>';
+                    '<div class="empty-state">Failed to load dashboard.</div>';
             }
             return;
         }
 
         const data = await res.json();
 
-        // --- Rendering Logic ---
         userNameEl.textContent = data.name || username;
         metaEl.textContent = `${data.student_id || "N/A"} • ${
             data.is_dormer ? "Dormer" : "Non-Dormer"
@@ -97,7 +96,7 @@ async function load() {
     } catch (err) {
         console.error("Dashboard Load Error:", err);
         logsContainer.innerHTML =
-            '<div class="empty-state">❌ Connection Error</div>';
+            '<div class="empty-state">Connection Error</div>';
     }
 }
 
@@ -105,27 +104,77 @@ async function loadAnnouncements() {
     const container = document.getElementById('announcements-container');
     
     try {
-        const response = await fetch('/api/announcements/?limit=2'); // Fetch only the 2 latest
+        const response = await fetch('/api/announcements/');
         const announcements = await response.json();
 
-        if (announcements.length === 0) {
+        if (!announcements || announcements.length === 0) {
             container.innerHTML = '<p class="text-slate-400 text-xs text-center py-4">No recent announcements.</p>';
             return;
         }
 
-        // Clear loading state and map through data
-        container.innerHTML = announcements.map(item => `
-            <div class="bg-amber-50 border border-amber-100 p-4 rounded-xl transition hover:shadow-md">
-                <span class="bg-${item.tag_color || 'amber'}-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block">
-                    ${item.tag_name}
-                </span>
-                <div class="font-bold text-amber-900 text-sm mb-1">${item.title}</div>
-                <p class="text-amber-800 text-xs leading-relaxed opacity-80 line-clamp-2">
-                    ${item.content}
-                </p>
-                <a href="/announcements/${item.id}" class="text-amber-600 text-xs font-bold mt-2 inline-block hover:underline">Read More →</a>
-            </div>
-        `).join('');
+        const recentAnnouncements = announcements.slice(0, 2);
+        
+        const categoryStyles = {
+            'URGENT': {
+                bg: '#fee2e2',
+                border: '#fecaca',
+                badge: '#ef4444',
+                text: '#7f1d1d',
+                label: 'Urgent'
+            },
+            'VOLUNTEER': {
+                bg: '#d1fae5',
+                border: '#a7f3d0',
+                badge: '#10b981',
+                text: '#064e3b',
+                label: 'Volunteer'
+            },
+            'OPPORTUNITY': {
+                bg: '#fef3c7',
+                border: '#fde68a',
+                badge: '#f59e0b',
+                text: '#78350f',
+                label: 'Opportunity'
+            },
+            'FOODSTUBS': {
+                bg: '#e9d5ff',
+                border: '#d8b4fe',
+                badge: '#a855f7',
+                text: '#581c87',
+                label: 'Food Stubs'
+            },
+            'GENERAL': {
+                bg: '#dbeafe',
+                border: '#bfdbfe',
+                badge: '#3b82f6',
+                text: '#1e3a8a',
+                label: 'General'
+            }
+        };
+
+        container.innerHTML = recentAnnouncements.map(item => {
+            const style = categoryStyles[item.category] || categoryStyles['GENERAL'];
+            
+            return `
+                <a href="/api/announcements/${item.id}/" 
+                   class="block p-4 rounded-xl transition hover:shadow-md"
+                   style="background-color: ${style.bg}; border: 1px solid ${style.border};">
+                    <span class="text-white text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block"
+                          style="background-color: ${style.badge};">
+                        ${style.label}
+                    </span>
+                    <div class="font-bold text-sm mb-1" style="color: ${style.text};">
+                        ${item.title}
+                    </div>
+                    <p class="text-xs leading-relaxed opacity-80 line-clamp-2" style="color: ${style.text};">
+                        ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}
+                    </p>
+                    <span class="text-xs font-bold mt-2 inline-block hover:underline" style="color: ${style.badge};">
+                        Read More →
+                    </span>
+                </a>
+            `;
+        }).join('');
 
     } catch (error) {
         console.error('Error fetching announcements:', error);

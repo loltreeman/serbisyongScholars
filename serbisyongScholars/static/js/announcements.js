@@ -91,11 +91,11 @@ function createAnnouncementCard(announcement) {
                 ${userRole === 'ADMIN' ? `
                     <button onclick="event.stopPropagation(); editAnnouncement(${announcement.id})" 
                             class="text-blue-600 hover:text-blue-800 text-sm font-medium ml-2">
-                        ✏️ Edit
+                        Edit
                     </button>
                     <button onclick="event.stopPropagation(); deleteAnnouncement(${announcement.id})" 
                             class="text-red-600 hover:text-red-800 text-sm font-medium">
-                        🗑️ Delete
+                        Delete
                     </button>
                 ` : ''}
             </div>
@@ -147,6 +147,11 @@ function getCategoryInfo(category) {
             label: 'Opportunity',
             bgColor: 'bg-yellow-100',
             textColor: 'text-yellow-800'
+        },
+        'FOOD STUBS': {
+            label: 'Food Stubs',
+            bgColor: 'bg-orange-100',
+            textColor: 'text-orange-800'
         },
         'GENERAL': {
             label: 'General',
@@ -271,16 +276,11 @@ function editAnnouncement(id) {
     
     editingAnnouncementId = id;
     
-    // Populate form
     document.getElementById('announcement-title').value = announcement.title;
     document.getElementById('announcement-category').value = announcement.category;
     document.getElementById('announcement-content').value = announcement.content;
     document.getElementById('announcement-link').value = announcement.external_link || '';
-    
-    // Update modal title
     document.getElementById('modal-title').textContent = 'Edit Announcement';
-    
-    // Open modal
     document.getElementById('announcement-modal').classList.remove('hidden');
 }
 
