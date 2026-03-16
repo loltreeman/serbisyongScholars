@@ -360,7 +360,9 @@ def admin_scholars_list(request):
     total_scholars = len(scholars)
     completion_rate = (complete_count / total_scholars * 100) if total_scholars > 0 else 0
     average_hours = profiles.aggregate(Avg('total_hours_rendered'))['total_hours_rendered__avg'] or 0
-    
+    dormer_count = profiles.filter(is_dormer=True).count()
+    non_dormer_count = profiles.filter(is_dormer=False).count()
+
     # Get office statistics for charts
     office_stats = ServiceLog.objects.values('office_name').annotate(
         total_hours=Sum('hours')
@@ -374,7 +376,9 @@ def admin_scholars_list(request):
         'completion_rate': completion_rate,
         'average_hours': average_hours,
         'scholars': scholars,
-        'office_stats': list(office_stats)
+        'office_stats': list(office_stats),
+        'dormer_count': dormer_count,
+        'non_dormer_count': non_dormer_count,
     })
 
 @api_view(['GET', 'PUT'])

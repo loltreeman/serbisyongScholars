@@ -78,24 +78,41 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
-            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 class="text-gray-800 font-bold mb-4 flex items-center">
-                    <span class="mr-2">📊</span> Scholar Status Distribution
-                </h3>
-                <div class="relative h-64">
-                    <canvas id="distribution-chart"></canvas>
-                </div>
-            </div>
-            <div class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 class="text-gray-800 font-bold mb-4 flex items-center">
-                    <span class="mr-2">📈</span> Service Hours by Office
-                </h3>
-                <div class="relative h-64">
-                    <canvas id="office-chart"></canvas>
-                </div>
-            </div>
+
+        <!-- Charts Section: 2 Rows -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    
+    <!-- Row 1: Scholar Status Distribution -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+            <span class="mr-2">📊</span> Scholar Status Distribution
+        </h3>
+        <div class="relative h-64">
+            <canvas id="distribution-chart"></canvas>
         </div>
+    </div>
+    
+    <!-- Row 1: Dormer Status Distribution -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+            <span class="mr-2">🏠</span> Dormer Status Distribution
+        </h3>
+        <div class="relative h-64">
+            <canvas id="dormer-chart"></canvas>
+        </div>
+    </div>
+    
+</div>
+
+<!-- Row 2: Service Hours by Office (Full Width) -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+    <h3 class="text-gray-800 font-bold mb-4 flex items-center">
+        <span class="mr-2">📈</span> Service Hours by Office
+    </h3>
+    <div class="relative h-80">
+        <canvas id="office-chart"></canvas>
+    </div>
+</div>
                 
         
         <div class="bg-white rounded-lg shadow p-6 mb-6">
