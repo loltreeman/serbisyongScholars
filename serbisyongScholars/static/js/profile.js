@@ -36,15 +36,14 @@ async function loadProfile() {
         }
 
         const data = await res.json();
-        console.log('Profile data:', data); // Debug: see what API returns
         renderProfile(data);
     } catch (err) {
-        console.error("Profile load error", err);
         container.innerHTML = '<div class="empty-state p-6 text-center text-red-500">❌ Connection Error</div>';
     }
 }
 
 function renderProfile(data) {
+    // Get values directly from API response
     const rendered = data.total_hours_rendered || 0;
     const required = data.required_hours || 10;
     const carryOver = data.carry_over_hours || 0;
@@ -82,6 +81,14 @@ function renderProfile(data) {
                     <p class="text-xs text-slate-500 mb-1">Grant Type</p>
                     <p class="font-semibold text-slate-900">${data.grant_type || 'N/A'}</p>
                 </div>
+                ${data.role === 'SCHOLAR' ? `
+                <div>
+                    <p class="text-xs text-slate-500 mb-1">Dormer Status</p>
+                    <span class="inline-block ${data.is_dormer ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'} text-xs font-bold px-2 py-1 rounded-md">
+                        ${data.is_dormer ? 'Dormer (15 hrs)' : 'Non-Dormer (10 hrs)'}
+                    </span>
+                </div>
+                ` : ''}
             </div>
         </div>
     `;

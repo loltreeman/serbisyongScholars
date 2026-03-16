@@ -69,7 +69,8 @@ function renderAnnouncements(announcements) {
  */
 function createAnnouncementCard(announcement) {
     const div = document.createElement('div');
-    div.className = 'bg-white rounded-lg shadow hover:shadow-lg transition p-6';
+    div.className = 'bg-white rounded-lg shadow hover:shadow-lg transition p-6 cursor-pointer';
+    div.onclick = () => window.location.href = `/api/announcements/${announcement.id}/`;  // ← Add this
     
     const categoryInfo = getCategoryInfo(announcement.category);
     const date = new Date(announcement.created_at).toLocaleDateString('en-US', {
@@ -88,13 +89,13 @@ function createAnnouncementCard(announcement) {
             <div class="flex items-center gap-2">
                 <span class="text-sm text-gray-500">${date}</span>
                 ${userRole === 'ADMIN' ? `
-                    <button onclick="editAnnouncement(${announcement.id})" 
+                    <button onclick="event.stopPropagation(); editAnnouncement(${announcement.id})" 
                             class="text-blue-600 hover:text-blue-800 text-sm font-medium ml-2">
-                        Edit
+                        ✏️ Edit
                     </button>
-                    <button onclick="deleteAnnouncement(${announcement.id})" 
+                    <button onclick="event.stopPropagation(); deleteAnnouncement(${announcement.id})" 
                             class="text-red-600 hover:text-red-800 text-sm font-medium">
-                        Delete
+                        🗑️ Delete
                     </button>
                 ` : ''}
             </div>
@@ -104,12 +105,14 @@ function createAnnouncementCard(announcement) {
             ${announcement.title}
         </h3>
         
-        <p class="text-gray-600 mb-4 whitespace-pre-line">
+        <p class="text-gray-600 mb-4 line-clamp-3">
             ${announcement.content}
         </p>
         
         ${announcement.external_link ? `
-            <a href="${announcement.external_link}" target="_blank" 
+            <a href="${announcement.external_link}" 
+               target="_blank" 
+               onclick="event.stopPropagation()"
                class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
                 Learn More →
             </a>
@@ -249,7 +252,7 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
         }
         
         const successMessage = editingAnnouncementId ? 'updated' : 'posted';
-        alert('Announcement ${successMessage} successfully!');
+        alert(`Announcement ${successMessage} successfully!`); 
         closeCreateModal();
         loadAnnouncements();
     } catch (error) {
@@ -307,11 +310,11 @@ async function deleteAnnouncement(id) {
             throw new Error(errorData.error || 'Failed to delete announcement');
         }
         
-        alert('✅ Announcement deleted successfully!');
+        alert('Announcement deleted successfully!');
         loadAnnouncements();
     } catch (error) {
         console.error('Error:', error);
-        alert('❌ Failed to delete announcement: ' + error.message);
+        alert('Failed to delete announcement: ' + error.message);
     }
 }
 
@@ -319,8 +322,8 @@ async function deleteAnnouncement(id) {
  * Open create announcement modal
  */
 function openCreateModal() {
-    editingAnnouncementId = null;  // Reset editing mode
+    editingAnnouncementId = null;  
     document.getElementById('announcement-modal').classList.remove('hidden');
     document.getElementById('announcement-form').reset();
-    document.getElementById('modal-title').textContent = 'Create Announcement';  // Reset title
+    document.getElementById('modal-title').textContent = 'Create Announcement';  
 }

@@ -14,6 +14,7 @@ urlpatterns = [
     path('profile-page/', views.profile_page, name='profile_page'),
     path('announcements/', views.announcements_list, name='announcements_list'),  
     path('announcements-page/', views.announcements_page, name='announcements_page'),  
+    path('announcements/<int:announcement_id>/', views.announcement_detail_view, name='announcement_detail'),
     path('recent-announcements/', views.get_recent_announcements, name='api_recent_announcements'),  
     path('admin/assign-moderator/', views.assign_moderator, name='assign_moderator'),
     path('admin/search-users/', views.search_users, name='search_users'),

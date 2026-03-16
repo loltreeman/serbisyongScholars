@@ -639,6 +639,19 @@ def announcements_page(request):
     return render(request, 'announcements.html')
 
 @login_required(login_url='/login/')
+def announcement_detail_view(request, announcement_id):
+    """Render single announcement detail page"""
+    try:
+        announcement = Announcement.objects.get(id=announcement_id)
+        return render(request, 'announcement_detail.html', {
+            'announcement': announcement
+        })
+    except Announcement.DoesNotExist:
+        return render(request, 'announcement_detail.html', {
+            'error': 'Announcement not found'
+        })
+
+@login_required(login_url='/login/')
 def dashboard_router(request):
     """Route users to appropriate dashboard based on role"""
     if request.user.role == 'ADMIN':
