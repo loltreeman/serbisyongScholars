@@ -23,11 +23,9 @@ form.addEventListener("submit", async (e) => {
             return;
         }
 
-        // Store tokens
         localStorage.setItem("access", data.access);
         localStorage.setItem("refresh", data.refresh);
 
-        // Capture Role
         const userRole = data.user ? data.user.role : null;
         localStorage.setItem("userRole", userRole);
         localStorage.setItem("loggedInUsername", data.user.username);
@@ -35,12 +33,11 @@ form.addEventListener("submit", async (e) => {
         console.log("LOGIN SUCCESS. ROLE:", userRole);
 
         if (userRole === "ADMIN") {
-            window.location.replace("/api/admin/dashboard/");
-        } else if (userRole === "SCHOLAR") {
-            window.location.replace("/dashboard/");
+            window.location.replace("/api/dashboard/admin");  
+        } else if (userRole === "MODERATOR") {
+            window.location.replace("/moderator/dashboard/"); 
         } else {
-            // Fallback for Moderators or undefined
-            window.location.replace("/dashboard/");
+            window.location.replace("/scholar/dashboard/"); 
         }
 
     } catch (err) {

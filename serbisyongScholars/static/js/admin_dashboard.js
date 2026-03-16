@@ -212,9 +212,12 @@ function getProgressBarColor(percentage) {
  * View scholar details
  */
 function viewScholarDetails(studentId) {
-    window.location.href = `/scholar/${studentId}/profile/`;
+    // Option 1: Open in new tab (recommended)
+    window.open(`/profile?student_id=${studentId}`, '_blank');
+    
+    // Option 2: Navigate in same window (uncomment to use)
+    // window.location.href = `/profile?student_id=${studentId}`;
 }
-
 /**
  * Show loading state
  */
@@ -244,14 +247,6 @@ function showError(message) {
             </td>
         </tr>
     `;
-}
-
-/**
- * Logout function
- */
-function logout() {
-    localStorage.clear();
-    window.location.href = '/login/';
 }
 
 /**

@@ -11,41 +11,9 @@
     
         </style>
     </head>
-    <body class="bg-slate-50 text-slate-800 mb-20 md:mb-0">
-        
-        <nav class="bg-[#1e3a8a] text-white shadow-md px-6 py-4">
-            <div class="max-w-7xl mx-auto flex justify-between items-center">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 bg-[#fbbf24] rounded-full flex items-center justify-center font-bold text-[#1e3a8a]">S</div>
-                    <span class="text-xl font-bold tracking-tight">serbisyongScholar</span>
-                </div>
-
-                <div class="hidden md:flex items-center gap-6">
-                    <a href="/dashboard" class="bg-white/20 px-3 py-2 rounded-md font-semibold text-sm">📊 Dashboard</a>
-                    <a href="/profile" class="hover:bg-white/10 px-3 py-2 rounded-md text-sm transition">👤 Profile</a>
-                    <a href="/announcements" class="hover:bg-white/10 px-3 py-2 rounded-md text-sm transition">📢 Announcements</a>
-                    <a href="/vouchers" class="hover:bg-white/10 px-3 py-2 rounded-md text-sm transition">🎟️ Vouchers</a>
-                    <button id="logout" class="bg-slate-100 text-slate-700 hover:bg-white px-4 py-2 rounded-lg font-semibold text-sm transition">Logout</button>
-                </div>
-
-                <button id="logout-mobile" class="md:hidden bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-semibold text-sm">Logout</button>
-            </div>
-        </nav>
-
-        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 grid grid-cols-4 py-3 z-50 md:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-            <a href="/dashboard" class="flex flex-col items-center gap-1 text-[#1e40af] font-bold">
-                <span class="text-xl">📊</span><span class="text-[10px]">Home</span>
-            </a>
-            <a href="/profile" class="flex flex-col items-center gap-1 text-slate-500">
-                <span class="text-xl">👤</span><span class="text-[10px]">Profile</span>
-            </a>
-            <a href="/announcements" class="flex flex-col items-center gap-1 text-slate-500">
-                <span class="text-xl">📢</span><span class="text-[10px]">Alerts</span>
-            </a>
-            <a href="/vouchers" class="flex flex-col items-center gap-1 text-slate-500">
-                <span class="text-xl">🎟️</span><span class="text-[10px]">Vouchers</span>
-            </a>
-        </div>
+<body class="bg-slate-50 text-slate-800 mb-20 md:mb-0">
+    
+    {% include 'partials/navbar.html' %}
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
             
@@ -139,7 +107,7 @@
                             </div>
                         </div>
 
-                        <a href="/announcements" class="block text-center text-sm font-bold text-blue-700 hover:text-blue-900 transition mt-4">View All Announcements</a>
+                        <a href="{% url 'announcements_page' %}" class="block text-center text-sm font-bold text-blue-700 hover:text-blue-900 transition mt-4">View All Announcements</a>
                     </div>
                 </aside>
                 

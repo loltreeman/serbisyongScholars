@@ -1,0 +1,33 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moderator Dashboard - serbisyongScholar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    
+    {% include 'partials/navbar.html' %}
+    
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-6">Moderator Dashboard</h1>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <a href="/encode" class="block p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+                    <h3 class="font-bold text-lg mb-2">Encode Service Hours</h3>
+                    <p class="text-gray-600">Log service hours for scholars</p>
+                </a>
+                <a href="{% url 'announcements_page' %}" class="block p-6 bg-green-50 rounded-lg hover:bg-green-100 transition">
+                    <h3 class="font-bold text-lg mb-2">View Announcements</h3>
+                    <p class="text-gray-600">Check latest announcements</p>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+</body>
+</html>

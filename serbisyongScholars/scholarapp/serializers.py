@@ -1,15 +1,15 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
-from .models import User, ScholarProfile, ServiceLog
+from .models import User, ScholarProfile, ServiceLog, Announcement
 from datetime import date
-
 
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
+    student_id = serializers.CharField(max_length=6, required=False)
 
     class Meta:
         model = User
-        fields = ['email', 'password', 'first_name', 'last_name']
+        fields = ['email', 'password', 'first_name', 'last_name', 'student_id']
 
     def validate_email(self, value):
         if not value.endswith('@ateneo.edu') and not value.endswith('@student.ateneo.edu'):
@@ -34,6 +34,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
         first_name = validated_data.get('first_name', '')
         last_name = validated_data.get('last_name', '')
         email = validated_data.get('email', '')
+        student_id = validated_data.pop('student_id', None)
 
         base_username = f"{first_name or ''}{last_name or ''}".strip() or (email.split('@')[0] if email else '')
         username = self._generate_unique_username(base_username)
@@ -45,11 +46,23 @@ class RegistrationSerializer(serializers.ModelSerializer):
             first_name=first_name,
             last_name=last_name,
             is_active=False,
+            role='SCHOLAR'
         )
+
+        # Create ScholarProfile if student_id provided
+        if student_id:
+            ScholarProfile.objects.create(
+                user=user,
+                student_id=student_id,
+                program_course='',
+                scholar_grant='',
+                is_dormer=False
+            )
 
         scholar_group, _ = Group.objects.get_or_create(name='Scholar')
         user.groups.add(scholar_group)
         return user
+
 
 class SignUpSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -74,7 +87,6 @@ class SignUpSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         student_id = validated_data.pop('student_id')
         
-        # This is when we will create user
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],
@@ -86,7 +98,6 @@ class SignUpSerializer(serializers.ModelSerializer):
             is_email_verified=False
         )
         
-        # This is when we will create scholar profile
         ScholarProfile.objects.create(
             user=user,
             student_id=student_id,
@@ -96,10 +107,12 @@ class SignUpSerializer(serializers.ModelSerializer):
         
         return user
 
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role']
+
 
 class ServiceLogSerializer(serializers.ModelSerializer):
     student_id = serializers.CharField(write_only=True)
@@ -125,7 +138,6 @@ class ServiceLogSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("No scholar found with that student ID.")
         return value
     
-    # creating the service hours log
     def create(self, validated_data):
         student_id = validated_data.pop('student_id')
         scholar = ScholarProfile.objects.get(student_id=student_id)
@@ -134,3 +146,10 @@ class ServiceLogSerializer(serializers.ModelSerializer):
             created_by=self.context['request'].user,
             **validated_data
         )
+class AnnouncementSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source='author.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Announcement
+        fields = ['id', 'title', 'content', 'category', 'author_name', 'created_at', 'external_link']
+        read_only_fields = ['author', 'created_at']

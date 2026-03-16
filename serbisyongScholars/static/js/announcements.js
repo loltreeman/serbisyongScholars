@@ -1,5 +1,6 @@
 let allAnnouncements = [];
 let currentFilter = 'all';
+let editingAnnouncementId = null;
 
 // Load announcements on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -77,12 +78,26 @@ function createAnnouncementCard(announcement) {
         day: 'numeric'
     });
     
+    const userRole = localStorage.getItem('userRole');
+    
     div.innerHTML = `
         <div class="flex items-start justify-between mb-3">
             <span class="px-3 py-1 rounded-full text-sm font-semibold ${categoryInfo.bgColor} ${categoryInfo.textColor}">
-                ${categoryInfo.emoji} ${categoryInfo.label}
+                ${categoryInfo.label}
             </span>
-            <span class="text-sm text-gray-500">${date}</span>
+            <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-500">${date}</span>
+                ${userRole === 'ADMIN' ? `
+                    <button onclick="editAnnouncement(${announcement.id})" 
+                            class="text-blue-600 hover:text-blue-800 text-sm font-medium ml-2">
+                        Edit
+                    </button>
+                    <button onclick="deleteAnnouncement(${announcement.id})" 
+                            class="text-red-600 hover:text-red-800 text-sm font-medium">
+                        Delete
+                    </button>
+                ` : ''}
+            </div>
         </div>
         
         <h3 class="text-xl font-bold text-gray-900 mb-2">
@@ -179,7 +194,25 @@ function closeCreateModal() {
 }
 
 /**
- * Handle form submission
+ * Get CSRF token from cookie
+ */
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+/**
+ * Handle form submission (create or update)
  */
 document.getElementById('announcement-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -191,27 +224,103 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
         external_link: document.getElementById('announcement-link').value || null
     };
     
+    // If editing, add the ID
+    if (editingAnnouncementId) {
+        data.id = editingAnnouncementId;
+    }
+    
     try {
+        const csrftoken = getCookie('csrftoken');
+        const method = editingAnnouncementId ? 'PUT' : 'POST';
+        
         const response = await fetch('/api/announcements/', {
-            method: 'POST',
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`  
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': csrftoken
             },
             body: JSON.stringify(data)
         });
         
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('Error creating announcement:', errorData);
-            throw new Error(errorData.error || 'Failed to create announcement');
+            throw new Error(errorData.error || errorData.detail || 'Failed to save announcement');
         }
         
-        alert('Announcement posted successfully!');
+        const successMessage = editingAnnouncementId ? 'updated' : 'posted';
+        alert('Announcement ${successMessage} successfully!');
         closeCreateModal();
-        loadAnnouncements(); 
+        loadAnnouncements();
     } catch (error) {
         console.error('Error:', error);
-        alert('Failed to post announcement: ' + error.message);
+        alert('Failed to save announcement: ' + error.message);
     }
 });
+
+
+/**
+ * Edit announcement
+ */
+function editAnnouncement(id) {
+    const announcement = allAnnouncements.find(a => a.id === id);
+    if (!announcement) return;
+    
+    editingAnnouncementId = id;
+    
+    // Populate form
+    document.getElementById('announcement-title').value = announcement.title;
+    document.getElementById('announcement-category').value = announcement.category;
+    document.getElementById('announcement-content').value = announcement.content;
+    document.getElementById('announcement-link').value = announcement.external_link || '';
+    
+    // Update modal title
+    document.getElementById('modal-title').textContent = 'Edit Announcement';
+    
+    // Open modal
+    document.getElementById('announcement-modal').classList.remove('hidden');
+}
+
+/**
+ * Delete announcement
+ */
+async function deleteAnnouncement(id) {
+    if (!confirm('Are you sure you want to delete this announcement?')) {
+        return;
+    }
+    
+    try {
+        const csrftoken = getCookie('csrftoken');
+        
+        const response = await fetch('/api/announcements/', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ id })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete announcement');
+        }
+        
+        alert('✅ Announcement deleted successfully!');
+        loadAnnouncements();
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Failed to delete announcement: ' + error.message);
+    }
+}
+
+/**
+ * Open create announcement modal
+ */
+function openCreateModal() {
+    editingAnnouncementId = null;  // Reset editing mode
+    document.getElementById('announcement-modal').classList.remove('hidden');
+    document.getElementById('announcement-form').reset();
+    document.getElementById('modal-title').textContent = 'Create Announcement';  // Reset title
+}

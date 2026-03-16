@@ -2,8 +2,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('assign-form');
     const messageBox = document.getElementById('assign-message');
     const submitButton = document.getElementById('assign-button');
-
-    // Search / dropdown elements
     const userSearch = document.getElementById('user-search');
     const userDropdown = document.getElementById('user-dropdown');
     const hiddenUsername = document.getElementById('moderator-username');
@@ -165,3 +163,4 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
+

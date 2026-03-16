@@ -13,8 +13,8 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from django.shortcuts import render
-from .serializers import RegistrationSerializer, ServiceLogSerializer
+from django.shortcuts import render, redirect
+from .serializers import RegistrationSerializer, ServiceLogSerializer, AnnouncementSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -46,7 +46,6 @@ def get_available_offices():
     return sorted(offices, key=str.casefold)
 
 # Register a new user by default it is a scholar
-# -- SignUp View -- #
 @api_view(['POST'])
 def signup(request):
     serializer = RegistrationSerializer(data=request.data)
@@ -59,7 +58,6 @@ def signup(request):
         return Response({'message': 'Registration successful. Please check your email to confirm your account.'}, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# -- Send Verification Email -- #
 def send_confirmation_email(user):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
@@ -120,49 +118,57 @@ def verify_email(request):
     
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        # 1. Capture the input (which might be an email)
+        # Handle Email login by finding the actual username
         login_id = attrs.get(self.username_field)
-        password = attrs.get('password')
-
-        # 2. Check if the input is an email and map it to the real username
         if login_id and '@' in login_id:
             try:
                 user = User.objects.get(email__iexact=login_id)
                 attrs[self.username_field] = user.username
             except User.DoesNotExist:
-                # If email not found, let the parent class handle the error
                 pass
 
-        # 3. Call the parent validate (which now has the correct username)
+        # Standard JWT validation
         data = super().validate(attrs)
 
-        # 4. Add your custom user data to the response
+        # Add user info for the frontend
         data['user'] = {
             'username': self.user.username,
             'email': self.user.email,
-            'first_name': getattr(self.user, 'first_name', ''),
-            'last_name': getattr(self.user, 'last_name', ''),
             'role': self.user.role,
-            'is_active': self.user.is_active,
         }
-
-        return data
-    
-    def validate(self, attrs):
-        data = super().validate(attrs)
-
-        data['user'] = {
-            'username': self.user.username,
-            'email': self.user.email,
-            'first_name': getattr(self.user, 'first_name', ''),
-            'last_name': getattr(self.user, 'last_name', ''),
-            'role': self.user.role,
-            'is_active': self.user.is_active,
-        }
-
         return data
 
 class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        # 1. Map email to username before JWT attempts to authenticate
+        login_id = request.data.get('username')
+        password = request.data.get('password')
+
+        if login_id and '@' in login_id:
+            try:
+                user_obj = User.objects.get(email__iexact=login_id)
+                request.data['username'] = user_obj.username
+            except User.DoesNotExist:
+                pass 
+
+        # 2. Call the JWT logic
+        response = super().post(request, *args, **kwargs)
+        
+        # 3. Create a Django session so the @login_required decorators work
+        if response.status_code == 200:
+            from django.contrib.auth import authenticate, login as django_login
+            # Use the actual username from request.data (mapped above)
+            user = authenticate(
+                username=request.data.get('username'),
+                password=password
+            )
+            if user:
+                django_login(request, user)
+                
+        return response
+    
     serializer_class = MyTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
@@ -221,7 +227,6 @@ class MyTokenObtainPairView(TokenObtainPairView):
                 
         return response
 
-# -- Scholar Dashboard View -- #
 @api_view(['GET'])
 def get_scholar_dashboard(request):
     username = request.GET.get('username')
@@ -301,8 +306,9 @@ def admin_scholars_list(request):
     status_filter = request.GET.get('status', 'all')
     search_query = request.GET.get('search', '')
     
-    # Get all scholar profiles
-    profiles = ScholarProfile.objects.select_related('user').all()
+    profiles = ScholarProfile.objects.select_related('user').filter(
+        user__role='SCHOLAR' 
+    )
     
     # Apply search filter
     if search_query:
@@ -358,7 +364,7 @@ def admin_scholars_list(request):
     # Get office statistics for charts
     office_stats = ServiceLog.objects.values('office_name').annotate(
         total_hours=Sum('hours')
-    ).order_by('-total_hours')[:5]  # Top 5 offices
+    ).order_by('-total_hours')[:5]
     
     return Response({
         'total': total_scholars,
@@ -368,32 +374,49 @@ def admin_scholars_list(request):
         'completion_rate': completion_rate,
         'average_hours': average_hours,
         'scholars': scholars,
-        'office_stats': list(office_stats) 
+        'office_stats': list(office_stats)
     })
 
-
-# --- Profile API and page ---
 @api_view(['GET', 'PUT'])
 @permission_classes([AllowAny])
 def user_profile(request):
     """Retrieve or update a user's profile information.
 
     GET parameters:
-        username - required, identifies the user whose profile is requested.
+        username - identifies the user by username
+        student_id - identifies the user by student ID (for scholars)
 
     PUT body (JSON):
-        username (required) and any of the editable fields. Only admins may
-        change the ``role`` field; users may update their own ``first_name``
-        and ``last_name``. Other fields may be ignored or validated.
+        username (required) and any of the editable fields.
     """
-    username = request.GET.get('username') if request.method == 'GET' else request.data.get('username')
-    if not username:
-        return Response({'error': 'Please provide a username.'}, status=400)
+    if request.method == 'GET':
+        username = request.GET.get('username')
+        student_id = request.GET.get('student_id')
+        
+        if not username and not student_id:
+            return Response({'error': 'Please provide a username or student_id.'}, status=400)
 
-    try:
-        user = User.objects.get(username=username)
-    except User.DoesNotExist:
-        return Response({'error': 'User not found'}, status=404)
+        try:
+            if student_id:
+                # Find user by student_id
+                scholar_profile = ScholarProfile.objects.select_related('user').get(student_id=student_id)
+                user = scholar_profile.user
+            else:
+                # Find user by username
+                user = User.objects.get(username=username)
+        except ScholarProfile.DoesNotExist:
+            return Response({'error': 'Scholar not found'}, status=404)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
+    else:  # PUT
+        username = request.data.get('username')
+        if not username:
+            return Response({'error': 'Please provide a username.'}, status=400)
+        
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
 
     scholar = getattr(user, 'scholar_profile', None)
 
@@ -406,8 +429,14 @@ def user_profile(request):
             'student_id': getattr(scholar, 'student_id', None),
             'course_department': getattr(scholar, 'program_course', None),
             'grant_type': getattr(scholar, 'scholar_grant', None),
+            'total_hours_rendered': getattr(scholar, 'total_hours_rendered', 0),
+            'required_hours': getattr(scholar, 'required_hours', 10),
+            'carry_over_hours': getattr(scholar, 'carry_over_hours', 0),
+            'is_dormer': getattr(scholar, 'is_dormer', False),
+            
             'service_logs': []
         }
+
         if scholar:
             logs = ServiceLog.objects.filter(scholar=scholar)
             data['service_logs'] = [
@@ -420,15 +449,16 @@ def user_profile(request):
                 }
                 for log in logs
             ]
+
         return Response(data)
 
     # PUT: update profile
     if not request.user.is_authenticated:
         return Response({'error': 'Authentication required to update profile.'}, status=401)
 
-    # Only admin can change role, or user can update their own name
     payload = request.data
     updated = False
+    
     if 'role' in payload:
         if request.user.role != 'ADMIN':
             return Response({'error': 'Admin access required to change role.'}, status=403)
@@ -436,9 +466,11 @@ def user_profile(request):
         if new_role in dict(User.ROLE_CHOICES):
             user.role = new_role
             updated = True
+            
     if 'first_name' in payload and request.user == user:
         user.first_name = payload.get('first_name')
         updated = True
+        
     if 'last_name' in payload and request.user == user:
         user.last_name = payload.get('last_name')
         updated = True
@@ -449,7 +481,7 @@ def user_profile(request):
     else:
         return Response({'message': 'No changes made.'}, status=400)
 
-
+@login_required(login_url='/login/')
 def profile_page(request):
     """Render the profile HTML page."""
     return render(request, 'profile.html')
@@ -545,3 +577,73 @@ def create_service_log(request):
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def announcements_list(request):
+    """List, create, update, or delete announcements"""
+    
+    if request.method == 'GET':
+        announcements = Announcement.objects.all().order_by('-created_at')
+        serializer = AnnouncementSerializer(announcements, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        # Only admins can create
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        
+        serializer = AnnouncementSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(author=request.user)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+    
+    elif request.method == 'PUT':
+        # Only admins can edit
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        
+        announcement_id = request.data.get('id')
+        if not announcement_id:
+            return Response({'error': 'Announcement ID required'}, status=400)
+        
+        try:
+            announcement = Announcement.objects.get(id=announcement_id)
+        except Announcement.DoesNotExist:
+            return Response({'error': 'Announcement not found'}, status=404)
+        
+        serializer = AnnouncementSerializer(announcement, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=200)
+        return Response(serializer.errors, status=400)
+    
+    elif request.method == 'DELETE':
+        # Only admins can delete
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        
+        announcement_id = request.data.get('id') or request.GET.get('id')
+        if not announcement_id:
+            return Response({'error': 'Announcement ID required'}, status=400)
+        
+        try:
+            announcement = Announcement.objects.get(id=announcement_id)
+            announcement.delete()
+            return Response({'message': 'Announcement deleted successfully'}, status=200)
+        except Announcement.DoesNotExist:
+            return Response({'error': 'Announcement not found'}, status=404)
+    
+def announcements_page(request):
+    """Render announcements page"""
+    return render(request, 'announcements.html')
+
+@login_required(login_url='/login/')
+def dashboard_router(request):
+    """Route users to appropriate dashboard based on role"""
+    if request.user.role == 'ADMIN':
+        return redirect('admin_dashboard')
+    elif request.user.role == 'MODERATOR':
+        return redirect('moderator_dashboard')  
+    else:  
+        return redirect('scholar_dashboard')
