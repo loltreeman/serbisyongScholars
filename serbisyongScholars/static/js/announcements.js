@@ -13,8 +13,18 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function checkUserRole() {
     const userRole = localStorage.getItem('userRole');
-    if (userRole === 'ADMIN') {
-        document.getElementById('admin-controls').classList.remove('hidden');
+    console.log('User Role:', userRole);
+    
+    if (userRole === 'ADMIN' || userRole === 'MODERATOR') {
+        const createBtn = document.getElementById('admin-controls');
+        createBtn.classList.remove('hidden');
+        
+        if (userRole === 'MODERATOR') {
+            const buttonText = createBtn.querySelector('button');
+            if (buttonText) {
+                buttonText.textContent = '➕ Submit Announcement for Approval';
+            }
+        }
     }
 }
 
@@ -69,8 +79,7 @@ function renderAnnouncements(announcements) {
  */
 function createAnnouncementCard(announcement) {
     const div = document.createElement('div');
-    div.className = 'bg-white rounded-lg shadow hover:shadow-lg transition p-6 cursor-pointer';
-    div.onclick = () => window.location.href = `/api/announcements/${announcement.id}/`;  // ← Add this
+    div.className = 'bg-white rounded-lg shadow hover:shadow-lg transition p-6';
     
     const categoryInfo = getCategoryInfo(announcement.category);
     const date = new Date(announcement.created_at).toLocaleDateString('en-US', {
@@ -80,54 +89,111 @@ function createAnnouncementCard(announcement) {
     });
     
     const userRole = localStorage.getItem('userRole');
+    const currentUser = localStorage.getItem('loggedInUsername');
+    
+    // Determine if we should show status badge
+    let showStatusBadge = false;
+    if (userRole === 'ADMIN') {
+        showStatusBadge = true; // Admins see status on ALL posts
+    } else if (userRole === 'MODERATOR') {
+        const isAuthor = announcement.author_name && announcement.author_name.toLowerCase().includes(currentUser.toLowerCase());
+        // Show badge if they are the author OR if it's already approved/rejected
+        if (isAuthor) {
+            showStatusBadge = true;
+        }
+    }
+    
+    // Show edit/delete buttons
+    let showActions = false;
+    if (userRole === 'ADMIN') {
+        showActions = true;
+    } else if (userRole === 'MODERATOR' && announcement.author_name.toLowerCase().includes(currentUser.toLowerCase()) && announcement.status === 'PENDING') {
+        showActions = true;
+    }
+    
+    // Show approve/reject buttons for pending announcements (ADMIN only)
+    const showApproval = userRole === 'ADMIN' && announcement.status === 'PENDING';
     
     div.innerHTML = `
         <div class="flex items-start justify-between mb-3">
-            <span class="px-3 py-1 rounded-full text-sm font-semibold ${categoryInfo.bgColor} ${categoryInfo.textColor}">
-                ${categoryInfo.label}
-            </span>
             <div class="flex items-center gap-2">
-                <span class="text-sm text-gray-500">${date}</span>
-                ${userRole === 'ADMIN' ? `
-                    <button onclick="event.stopPropagation(); editAnnouncement(${announcement.id})" 
-                            class="text-blue-600 hover:text-blue-800 text-sm font-medium ml-2">
-                        Edit
-                    </button>
-                    <button onclick="event.stopPropagation(); deleteAnnouncement(${announcement.id})" 
-                            class="text-red-600 hover:text-red-800 text-sm font-medium">
-                        Delete
-                    </button>
+                <span class="px-3 py-1 rounded-full text-sm font-semibold ${categoryInfo.bgColor} ${categoryInfo.textColor}">
+                    ${categoryInfo.label}
+                </span>
+                ${showStatusBadge ? `
+                    ${announcement.status === 'APPROVED' ? `
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            Approved
+                        </span>
+                    ` : announcement.status === 'PENDING' ? `
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                            Pending
+                        </span>
+                    ` : announcement.status === 'REJECTED' ? `
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                            Rejected
+                        </span>
+                    ` : ''}
                 ` : ''}
+            </div>
+            <span class="text-sm text-gray-500">${date}</span>
+        </div>
+        
+        <div class="cursor-pointer" onclick="window.location.href = '/api/announcements/${announcement.id}/'">
+            <h3 class="text-xl font-bold text-gray-900 mb-2">
+                ${announcement.title}
+            </h3>
+            
+            <p class="text-gray-600 mb-4 line-clamp-3">
+                ${announcement.content}
+            </p>
+            
+            ${announcement.external_link ? `
+                <a href="${announcement.external_link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"> Learn More </a>
+            ` : ''}
+            
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm text-gray-500">
+                    Posted by ${announcement.author_name || 'OAA'}
+                </p>
             </div>
         </div>
         
-        <h3 class="text-xl font-bold text-gray-900 mb-2">
-            ${announcement.title}
-        </h3>
-        
-        <p class="text-gray-600 mb-4 line-clamp-3">
-            ${announcement.content}
-        </p>
-        
-        ${announcement.external_link ? `
-            <a href="${announcement.external_link}" 
-               target="_blank" 
-               onclick="event.stopPropagation()"
-               class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
-                Learn More →
-            </a>
+        ${showStatusBadge && announcement.rejection_reason ? `
+            <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p class="text-sm text-red-800"><strong>Rejection Reason:</strong> ${announcement.rejection_reason}</p>
+            </div>
         ` : ''}
         
-        <div class="mt-4 pt-4 border-t border-gray-200">
-            <p class="text-sm text-gray-500">
-                Posted by ${announcement.author_name || 'OAA'}
-            </p>
-        </div>
+        ${showApproval ? `
+            <div class="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                <button onclick="event.stopPropagation(); approveAnnouncement(${announcement.id})" 
+                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                    Approve
+                </button>
+                <button onclick="event.stopPropagation(); rejectAnnouncementWithReason(${announcement.id})" 
+                        class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
+                    Reject
+                </button>
+            </div>
+        ` : ''}
+        
+        ${showActions && !showApproval ? `
+            <div class="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                <button onclick="event.stopPropagation(); editAnnouncement(${announcement.id})" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                    Edit
+                </button>
+                <button onclick="event.stopPropagation(); deleteAnnouncement(${announcement.id})" 
+                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
+                    Delete
+                </button>
+            </div>
+        ` : ''}
     `;
     
     return div;
 }
-
 /**
  * Get category styling info
  */
@@ -327,3 +393,146 @@ function openCreateModal() {
     document.getElementById('announcement-form').reset();
     document.getElementById('modal-title').textContent = 'Create Announcement';  
 }
+
+/**
+ * Approve announcement (ADMIN only)
+ */
+async function approveAnnouncement(id) {
+    if (!confirm('Approve this announcement and make it visible to all scholars?')) {
+        return;
+    }
+    
+    try {
+        const csrftoken = getCookie('csrftoken');
+        
+        const response = await fetch(`/api/announcements/${id}/approve/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ action: 'approve' })
+        });
+        
+        if (response.ok) {
+            showSuccessToast('Announcement approved!');
+            loadAnnouncements(); 
+        } else {
+            const errorData = await response.json();
+            alert('Failed to approve: ' + (errorData.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error approving announcement');
+    }
+}
+
+/**
+ * Reject announcement with reason (ADMIN only)
+ */
+async function rejectAnnouncementWithReason(id) {
+    const reason = prompt('Please provide a rejection reason (optional):');
+    
+    // User clicked cancel
+    if (reason === null) {
+        return;
+    }
+    
+    try {
+        const csrftoken = getCookie('csrftoken');
+        
+        const response = await fetch(`/api/announcements/${id}/approve/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ 
+                action: 'reject',
+                rejection_reason: reason || 'No reason provided'
+            })
+        });
+        
+        if (response.ok) {
+            showSuccessToast('Announcement rejected');
+            loadAnnouncements(); 
+        } else {
+            const errorData = await response.json();
+            alert('Failed to reject: ' + (errorData.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error rejecting announcement');
+    }
+}
+
+/**
+ * Show success toast notification
+ */
+function showSuccessToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 flex items-center gap-3';
+    toast.innerHTML = `
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="font-semibold">${message}</span>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Update DOMContentLoaded to include approve/reject buttons
+document.addEventListener('DOMContentLoaded', () => {
+    const editBtn = document.getElementById('editBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const approveBtn = document.getElementById('approveBtn');
+    const rejectBtn = document.getElementById('rejectBtn');
+    const editForm = document.getElementById('edit-form');
+
+    if (editBtn) {
+        editBtn.addEventListener('click', () => {
+            const id = editBtn.getAttribute('data-id');
+            editAnnouncement(id);
+        });
+    }
+    
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => {
+            const id = deleteBtn.getAttribute('data-id');
+            deleteAnnouncement(id);
+        });
+    }
+    
+    if (approveBtn) {
+        approveBtn.addEventListener('click', () => {
+            const id = approveBtn.getAttribute('data-id');
+            approveAnnouncement(id);
+        });
+    }
+    
+    if (rejectBtn) {
+        rejectBtn.addEventListener('click', () => {
+            const id = rejectBtn.getAttribute('data-id');
+            rejectAnnouncementWithReason(id);
+        });
+    }
+    
+    if (editForm) {
+        editForm.addEventListener('submit', handleEditSubmit);
+    }
+    
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeEditModal();
+        }
+    });
+});
