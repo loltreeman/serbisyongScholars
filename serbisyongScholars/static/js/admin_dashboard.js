@@ -1,17 +1,77 @@
 let allScholars = [];
-let filteredScholars = [];
 
 document.addEventListener("DOMContentLoaded", function () {
+    bindFilterControls();
     loadScholars();
 });
 
-async function loadScholars() {
+function bindFilterControls() {
+    const applyButton = document.getElementById("apply-filters");
+    const resetButton = document.getElementById("reset-filters");
+    const statusFilter = document.getElementById("filter-status");
+    const schoolFilter = document.getElementById("filter-school");
+    const searchInput = document.getElementById("search-input");
+
+    if (applyButton) {
+        applyButton.addEventListener("click", applyFilters);
+    }
+
+    if (resetButton) {
+        resetButton.addEventListener("click", resetFilters);
+    }
+
+    if (statusFilter) {
+        statusFilter.addEventListener("change", applyFilters);
+    }
+
+    if (schoolFilter) {
+        schoolFilter.addEventListener("change", applyFilters);
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                applyFilters();
+            }
+        });
+    }
+}
+
+function getCurrentFilters() {
+    return {
+        status: document.getElementById("filter-status").value,
+        school: document.getElementById("filter-school").value,
+        search: document.getElementById("search-input").value.trim(),
+    };
+}
+
+function buildQueryString(filters) {
+    const params = new URLSearchParams();
+
+    if (filters.status && filters.status !== "all") {
+        params.set("status", filters.status);
+    }
+
+    if (filters.school && filters.school !== "all") {
+        params.set("school", filters.school);
+    }
+
+    if (filters.search) {
+        params.set("search", filters.search);
+    }
+
+    const query = params.toString();
+    return query ? `?${query}` : "";
+}
+
+async function loadScholars(filters = getCurrentFilters()) {
     try {
         showLoading();
 
-        const response = await fetch("/api/admin/scholars/", {
+        const response = await fetch(`/api/admin/scholars/${buildQueryString(filters)}`, {
             headers: {
-                Authorization: `Bearer ${localStorage.getItem("access")}`, // Ensure this is 'access'
+                Authorization: `Bearer ${localStorage.getItem("access")}`,
             },
         });
 
@@ -20,10 +80,10 @@ async function loadScholars() {
         const data = await response.json();
 
         allScholars = data.scholars || [];
-        filteredScholars = allScholars;
 
         updateStats(data);
-        renderTable(filteredScholars);
+        renderTable(allScholars);
+        updateFilterSummary(data, filters);
 
         if (typeof Chart !== "undefined") {
             createCharts(data);
@@ -37,6 +97,35 @@ async function loadScholars() {
         console.error("JS CRASHED HERE:", error);
         showError("Failed to load scholars. Please try again.");
     }
+}
+
+function updateFilterSummary(data, filters) {
+    const summary = document.getElementById("filter-summary");
+
+    if (!summary) {
+        return;
+    }
+
+    const activeFilters = [];
+
+    if (filters.status && filters.status !== "all") {
+        activeFilters.push(`status: ${formatStatusLabel(filters.status)}`);
+    }
+
+    if (filters.school && filters.school !== "all") {
+        activeFilters.push(`school: ${filters.school}`);
+    }
+
+    if (filters.search) {
+        activeFilters.push(`search: "${filters.search}"`);
+    }
+
+    if (activeFilters.length === 0) {
+        summary.textContent = `Showing all scholars (${data.total || 0})`;
+        return;
+    }
+
+    summary.textContent = `Showing ${data.total || 0} scholar(s) filtered by ${activeFilters.join(", ")}`;
 }
 
 function createMiniProgress(percentage) {
@@ -73,7 +162,7 @@ function renderTable(scholars) {
     if (!scholars || scholars.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                     No scholars found
                 </td>
             </tr>
@@ -88,7 +177,7 @@ function renderTable(scholars) {
             scholar.rendered_hours,
             scholar.required_hours
         );
-        const status = getStatus(percentage);
+        const status = getStatusByKey(scholar.status || getStatusKey(percentage));
 
         const row = document.createElement("tr");
         row.className = "hover:bg-gray-50 transition";
@@ -98,6 +187,9 @@ function renderTable(scholars) {
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 ${scholar.name}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                ${scholar.school_display || "Not Set"}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 ${scholar.program || "N/A"}
@@ -128,42 +220,14 @@ function renderTable(scholars) {
 }
 
 function applyFilters() {
-    const statusFilter = document.getElementById("filter-status").value;
-    const schoolFilter = document.getElementById("filter-school").value;
-    const searchQuery = document
-        .getElementById("search-input")
-        .value.toLowerCase()
-        .trim();
+    loadScholars(getCurrentFilters());
+}
 
-    filteredScholars = allScholars.filter((scholar) => {
-        if (statusFilter !== "all") {
-            const percentage = calculatePercentage(
-                scholar.rendered_hours,
-                scholar.required_hours
-            );
-            const status = getStatusKey(percentage);
-            if (status !== statusFilter) return false;
-        }
-
-
-        if (schoolFilter !== "all") {
-            if (scholar.school !== schoolFilter) return false;
-        }
-
-        if (searchQuery) {
-            const matchesName = scholar.name
-                .toLowerCase()
-                .includes(searchQuery);
-            const matchesID = scholar.student_id
-                .toLowerCase()
-                .includes(searchQuery);
-            if (!matchesName && !matchesID) return false;
-        }
-
-        return true;
-    });
-
-    renderTable(filteredScholars);
+function resetFilters() {
+    document.getElementById("filter-status").value = "all";
+    document.getElementById("filter-school").value = "all";
+    document.getElementById("search-input").value = "";
+    loadScholars(getCurrentFilters());
 }
 
 function calculatePercentage(rendered, required) {
@@ -193,10 +257,38 @@ function getStatus(percentage) {
     }
 }
 
+function getStatusByKey(statusKey) {
+    if (statusKey === "complete") {
+        return {
+            text: "Complete",
+            bgColor: "bg-green-100",
+            textColor: "text-green-800",
+        };
+    }
+
+    if (statusKey === "on-track") {
+        return {
+            text: "On Track",
+            bgColor: "bg-yellow-100",
+            textColor: "text-yellow-800",
+        };
+    }
+
+    return {
+        text: "Behind",
+        bgColor: "bg-red-100",
+        textColor: "text-red-800",
+    };
+}
+
 function getStatusKey(percentage) {
     if (percentage >= 100) return "complete";
     if (percentage >= 70) return "on-track";
     return "behind";
+}
+
+function formatStatusLabel(statusKey) {
+    return getStatusByKey(statusKey).text;
 }
 
 function getProgressBarColor(percentage) {
@@ -214,7 +306,7 @@ function showLoading() {
     const tbody = document.getElementById("scholar-table");
     tbody.innerHTML = `
         <tr>
-            <td colspan="7" class="px-6 py-12 text-center">
+            <td colspan="8" class="px-6 py-12 text-center">
                 <div class="flex flex-col items-center">
                     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
                     <p class="text-gray-500">Loading scholars...</p>
@@ -228,7 +320,7 @@ function showError(message) {
     const tbody = document.getElementById("scholar-table");
     tbody.innerHTML = `
         <tr>
-            <td colspan="7" class="px-6 py-12 text-center text-red-600">
+            <td colspan="8" class="px-6 py-12 text-center text-red-600">
                 ${message}
             </td>
         </tr>

@@ -126,6 +126,109 @@ class AdminDashboardTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+class AdminScholarFilteringTests(TestCase):
+    """Tests for admin scholar filtering in the management view API."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='filteradmin',
+            email='filteradmin@ateneo.edu',
+            password='TestPass123!',
+            role='ADMIN',
+            is_email_verified=True
+        )
+
+        self.complete_profile = self._create_scholar(
+            username='complete1',
+            student_id='200001',
+            first_name='Alice',
+            school='SOSE',
+            hours=12.0,
+        )
+        self.on_track_profile = self._create_scholar(
+            username='ontrack1',
+            student_id='200002',
+            first_name='Brenda',
+            school='SOH',
+            hours=8.0,
+        )
+        self.behind_profile = self._create_scholar(
+            username='behind1',
+            student_id='200003',
+            first_name='Carlos',
+            school='SOSE',
+            hours=4.0,
+        )
+
+        self.api_client = APIClient()
+        self.url = reverse('admin_scholars_list')
+
+    def _create_scholar(self, username, student_id, first_name, school, hours):
+        user = User.objects.create_user(
+            username=username,
+            email=f'{username}@student.ateneo.edu',
+            password='TestPass123!',
+            role='SCHOLAR',
+            first_name=first_name,
+            last_name='Scholar',
+            is_email_verified=True
+        )
+
+        profile = ScholarProfile.objects.create(
+            user=user,
+            student_id=student_id,
+            program_course='BS Computer Science',
+            scholar_grant='FULL',
+            is_dormer=False,
+            school=school,
+        )
+
+        ServiceLog.objects.create(
+            scholar=profile,
+            date_rendered=date(2026, 2, 15),
+            hours=hours,
+            office_name='Office of Admission and Aid',
+            activity_description='Filtered test activity'
+        )
+
+        profile.refresh_from_db()
+        return profile
+
+    def test_school_filter_returns_only_matching_scholars(self):
+        self.api_client.force_authenticate(user=self.admin)
+        response = self.api_client.get(self.url, {'school': 'SOSE'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()
+        returned_ids = {scholar['student_id'] for scholar in data['scholars']}
+
+        self.assertEqual(returned_ids, {'200001', '200003'})
+        self.assertTrue(all(scholar['school'] == 'SOSE' for scholar in data['scholars']))
+        self.assertTrue(all(scholar['school_display'] == 'School of Science and Engineering' for scholar in data['scholars']))
+
+    def test_combined_status_and_search_filters(self):
+        self.api_client.force_authenticate(user=self.admin)
+        response = self.api_client.get(self.url, {
+            'status': 'on-track',
+            'search': 'Brenda',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['scholars'][0]['student_id'], '200002')
+        self.assertEqual(data['scholars'][0]['status'], 'on-track')
+
+    def test_invalid_school_filter_returns_bad_request(self):
+        self.api_client.force_authenticate(user=self.admin)
+        response = self.api_client.get(self.url, {'school': 'NOTREAL'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json()['error'], 'Invalid school filter.')
+
+
 class ProgressVisualizationTests(TestCase):
     """Tests for progress bar components"""
     

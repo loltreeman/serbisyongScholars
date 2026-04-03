@@ -71,6 +71,16 @@ def get_announcement_category_options():
     ]
 
 
+def get_scholar_status(rendered, required):
+    percentage = (rendered / required * 100) if required > 0 else 0
+
+    if percentage >= 100:
+        return 'complete'
+    if percentage >= 70:
+        return 'on-track'
+    return 'behind'
+
+
 def get_available_offices():
     offices = {
         office_name.strip()
@@ -353,19 +363,34 @@ def admin_scholars_list(request):
         return Response({'error': 'Admin access required'}, status=403)
     
     # Get filter parameters
-    status_filter = request.GET.get('status', 'all')
-    search_query = request.GET.get('search', '')
+    status_filter = (request.GET.get('status', 'all') or 'all').strip().lower()
+    school_filter = (request.GET.get('school', 'all') or 'all').strip().upper()
+    search_query = (request.GET.get('search', '') or '').strip()
+
+    valid_status_filters = {'all', 'complete', 'on-track', 'behind'}
+    valid_school_filters = {value for value, _label in ScholarProfile.SCHOOL_CHOICES}
+
+    if status_filter not in valid_status_filters:
+        return Response({'error': 'Invalid status filter.'}, status=400)
+
+    if school_filter != 'ALL' and school_filter not in valid_school_filters:
+        return Response({'error': 'Invalid school filter.'}, status=400)
     
     profiles = ScholarProfile.objects.select_related('user').filter(
         user__role='SCHOLAR' 
     )
+
+    if school_filter != 'ALL':
+        profiles = profiles.filter(school=school_filter)
     
     # Apply search filter
     if search_query:
         profiles = profiles.filter(
             Q(student_id__icontains=search_query) |
             Q(user__first_name__icontains=search_query) |
-            Q(user__last_name__icontains=search_query)
+            Q(user__last_name__icontains=search_query) |
+            Q(user__email__icontains=search_query) |
+            Q(program_course__icontains=search_query)
         )
     
     # Build scholar list
@@ -373,48 +398,55 @@ def admin_scholars_list(request):
     complete_count = 0
     on_track_count = 0
     behind_count = 0
+    rendered_hours_total = 0
+    filtered_profile_ids = []
     
     for profile in profiles:
         rendered = profile.total_hours_rendered
         required = profile.required_hours
-        percentage = (rendered / required * 100) if required > 0 else 0
-        
-        # Determine status
-        if percentage >= 100:
-            status = 'complete'
-            complete_count += 1
-        elif percentage >= 70:
-            status = 'on-track'
-            on_track_count += 1
-        else:
-            status = 'behind'
-            behind_count += 1
+        status = get_scholar_status(rendered, required)
         
         # Apply status filter
         if status_filter != 'all' and status != status_filter:
             continue
+
+        if status == 'complete':
+            complete_count += 1
+        elif status == 'on-track':
+            on_track_count += 1
+        else:
+            behind_count += 1
+
+        rendered_hours_total += rendered
+        filtered_profile_ids.append(profile.pk)
         
         scholars.append({
             'student_id': profile.student_id,
             'name': f"{profile.user.first_name} {profile.user.last_name}",
             'email': profile.user.email,
             'program': profile.program_course,
+            'school': profile.school,
+            'school_display': profile.get_school_display() if profile.school else 'Not Set',
             'is_dormer': profile.is_dormer,
             'rendered_hours': rendered,
             'required_hours': required,
             'carry_over': profile.carry_over_hours,
             'status': status
-        })
+    })
     
     # Calculate stats
     total_scholars = len(scholars)
     completion_rate = (complete_count / total_scholars * 100) if total_scholars > 0 else 0
-    average_hours = profiles.aggregate(Avg('total_hours_rendered'))['total_hours_rendered__avg'] or 0
-    dormer_count = profiles.filter(is_dormer=True).count()
-    non_dormer_count = profiles.filter(is_dormer=False).count()
+    average_hours = (rendered_hours_total / total_scholars) if total_scholars > 0 else 0
+
+    filtered_profiles = ScholarProfile.objects.filter(pk__in=filtered_profile_ids)
+    dormer_count = filtered_profiles.filter(is_dormer=True).count()
+    non_dormer_count = filtered_profiles.filter(is_dormer=False).count()
 
     # Get office statistics for charts
-    office_stats = ServiceLog.objects.values('office_name').annotate(
+    office_stats = ServiceLog.objects.filter(
+        scholar_id__in=filtered_profile_ids
+    ).values('office_name').annotate(
         total_hours=Sum('hours')
     ).order_by('-total_hours')[:5]
     
@@ -429,6 +461,11 @@ def admin_scholars_list(request):
         'office_stats': list(office_stats),
         'dormer_count': dormer_count,
         'non_dormer_count': non_dormer_count,
+        'applied_filters': {
+            'status': status_filter,
+            'school': school_filter if school_filter != 'ALL' else 'all',
+            'search': search_query,
+        },
     })
 
 @api_view(['GET', 'PUT'])
