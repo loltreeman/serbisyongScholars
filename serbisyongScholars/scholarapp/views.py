@@ -638,6 +638,7 @@ def announcements_list(request):
         except Announcement.DoesNotExist:
             return Response({'error': 'Announcement not found'}, status=404)
     
+@login_required(login_url='/login/')
 def announcements_page(request):
     """Render announcements page"""
     return render(request, 'announcements.html')

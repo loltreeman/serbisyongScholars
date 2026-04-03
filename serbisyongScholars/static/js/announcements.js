@@ -37,7 +37,11 @@ async function loadAnnouncements() {
         renderAnnouncements(allAnnouncements);
     } catch (error) {
         console.error('Error:', error);
-        showError('Failed to load announcements');
+        document.getElementById('announcements-container').innerHTML = `
+            <div class="text-center py-12">
+                <p class="text-red-500 text-lg">Failed to load announcements. Please try again.</p>
+            </div>
+        `;
     }
 }
 
@@ -70,7 +74,7 @@ function renderAnnouncements(announcements) {
 function createAnnouncementCard(announcement) {
     const div = document.createElement('div');
     div.className = 'bg-white rounded-lg shadow hover:shadow-lg transition p-6 cursor-pointer';
-    div.onclick = () => window.location.href = `/api/announcements/${announcement.id}/`;  // ← Add this
+    div.onclick = () => window.location.href = `/announcements/${announcement.id}/`;
     
     const categoryInfo = getCategoryInfo(announcement.category);
     const date = new Date(announcement.created_at).toLocaleDateString('en-US', {
@@ -184,14 +188,6 @@ function filterByCategory(category) {
     }
     
     renderAnnouncements(filtered);
-}
-
-/**
- * Open create announcement modal
- */
-function openCreateModal() {
-    document.getElementById('announcement-modal').classList.remove('hidden');
-    document.getElementById('announcement-form').reset();
 }
 
 /**

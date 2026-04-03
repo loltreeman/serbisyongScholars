@@ -62,7 +62,7 @@ async function deleteAnnouncement(id) {
         if (response.ok) {
             showSuccessToast('Announcement deleted successfully!');
             setTimeout(() => {
-                window.location.href = '/api/announcements-page/';
+                window.location.href = '/announcements/';
             }, 1000);
         } else {
             const errorData = await response.json();
