@@ -1,9 +1,37 @@
 let allAnnouncements = [];
 let currentFilter = 'all';
 let editingAnnouncementId = null;
+const CATEGORY_INFO = {
+    GENERAL: {
+        label: 'General',
+        bgColor: 'bg-blue-100',
+        textColor: 'text-blue-800'
+    },
+    URGENT: {
+        label: 'Urgent',
+        bgColor: 'bg-red-100',
+        textColor: 'text-red-800'
+    },
+    VOLUNTEER: {
+        label: 'Volunteer Work',
+        bgColor: 'bg-green-100',
+        textColor: 'text-green-800'
+    },
+    OPPORTUNITY: {
+        label: 'Scholarship Opportunity',
+        bgColor: 'bg-yellow-100',
+        textColor: 'text-yellow-800'
+    },
+    'FOOD STUBS': {
+        label: 'Food Stubs',
+        bgColor: 'bg-orange-100',
+        textColor: 'text-orange-800'
+    }
+};
 
 // Load announcements on page load
 document.addEventListener('DOMContentLoaded', function() {
+    bindCategoryFilters();
     loadAnnouncements();
     checkUserRole();
 });
@@ -34,7 +62,7 @@ async function loadAnnouncements() {
         const data = await response.json();
         allAnnouncements = data;
         
-        renderAnnouncements(allAnnouncements);
+        applyCurrentFilter();
     } catch (error) {
         console.error('Error:', error);
         document.getElementById('announcements-container').innerHTML = `
@@ -52,9 +80,12 @@ function renderAnnouncements(announcements) {
     const container = document.getElementById('announcements-container');
     
     if (!announcements || announcements.length === 0) {
+        const categoryLabel = currentFilter === 'all'
+            ? 'announcements'
+            : `${getCategoryInfo(currentFilter).label.toLowerCase()} announcements`;
         container.innerHTML = `
             <div class="text-center py-12">
-                <p class="text-gray-500 text-lg">No announcements yet</p>
+                <p class="text-gray-500 text-lg">No ${categoryLabel} yet</p>
             </div>
         `;
         return;
@@ -76,7 +107,10 @@ function createAnnouncementCard(announcement) {
     div.className = 'bg-white rounded-lg shadow hover:shadow-lg transition p-6 cursor-pointer';
     div.onclick = () => window.location.href = `/announcements/${announcement.id}/`;
     
-    const categoryInfo = getCategoryInfo(announcement.category);
+    const categoryInfo = getCategoryInfo(
+        announcement.category,
+        announcement.category_label
+    );
     const date = new Date(announcement.created_at).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -135,36 +169,47 @@ function createAnnouncementCard(announcement) {
 /**
  * Get category styling info
  */
-function getCategoryInfo(category) {
-    const categories = {
-        'URGENT': {
-            label: 'Urgent',
-            bgColor: 'bg-red-100',
-            textColor: 'text-red-800'
-        },
-        'VOLUNTEER': {
-            label: 'Volunteer Work',
-            bgColor: 'bg-green-100',
-            textColor: 'text-green-800'
-        },
-        'OPPORTUNITY': {
-            label: 'Opportunity',
-            bgColor: 'bg-yellow-100',
-            textColor: 'text-yellow-800'
-        },
-        'FOOD STUBS': {
-            label: 'Food Stubs',
-            bgColor: 'bg-orange-100',
-            textColor: 'text-orange-800'
-        },
-        'GENERAL': {
-            label: 'General',
-            bgColor: 'bg-blue-100',
-            textColor: 'text-blue-800'
-        }
+function getCategoryInfo(category, fallbackLabel = null) {
+    const categoryInfo = CATEGORY_INFO[category] || CATEGORY_INFO.GENERAL;
+
+    if (!fallbackLabel) {
+        return categoryInfo;
+    }
+
+    return {
+        ...categoryInfo,
+        label: fallbackLabel
     };
-    
-    return categories[category] || categories['GENERAL'];
+}
+
+function bindCategoryFilters() {
+    document.querySelectorAll('.category-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            filterByCategory(button.dataset.category);
+        });
+    });
+}
+
+function setActiveCategoryButton(category) {
+    document.querySelectorAll('.category-btn').forEach((button) => {
+        const isActive = button.dataset.category === category;
+        button.classList.toggle('bg-blue-600', isActive);
+        button.classList.toggle('text-white', isActive);
+        button.classList.toggle('bg-gray-200', !isActive);
+    });
+}
+
+function applyCurrentFilter() {
+    let filteredAnnouncements = allAnnouncements;
+
+    if (currentFilter !== 'all') {
+        filteredAnnouncements = allAnnouncements.filter(
+            (announcement) => announcement.category === currentFilter
+        );
+    }
+
+    setActiveCategoryButton(currentFilter);
+    renderAnnouncements(filteredAnnouncements);
 }
 
 /**
@@ -172,22 +217,7 @@ function getCategoryInfo(category) {
  */
 function filterByCategory(category) {
     currentFilter = category;
-    
-    // Update button styles
-    document.querySelectorAll('.category-btn').forEach(btn => {
-        btn.classList.remove('bg-blue-600', 'text-white');
-        btn.classList.add('bg-gray-200');
-    });
-    event.target.classList.remove('bg-gray-200');
-    event.target.classList.add('bg-blue-600', 'text-white');
-    
-    // Filter announcements
-    let filtered = allAnnouncements;
-    if (category !== 'all') {
-        filtered = allAnnouncements.filter(a => a.category === category);
-    }
-    
-    renderAnnouncements(filtered);
+    applyCurrentFilter();
 }
 
 /**

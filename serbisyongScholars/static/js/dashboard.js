@@ -3,6 +3,44 @@ const handleLogout = () => {
     window.location.href = "/login";
 };
 
+const announcementCategoryStyles = {
+    GENERAL: {
+        bg: '#dbeafe',
+        border: '#bfdbfe',
+        badge: '#3b82f6',
+        text: '#1e3a8a',
+        label: 'General'
+    },
+    URGENT: {
+        bg: '#fee2e2',
+        border: '#fecaca',
+        badge: '#ef4444',
+        text: '#7f1d1d',
+        label: 'Urgent'
+    },
+    VOLUNTEER: {
+        bg: '#d1fae5',
+        border: '#a7f3d0',
+        badge: '#10b981',
+        text: '#064e3b',
+        label: 'Volunteer Work'
+    },
+    OPPORTUNITY: {
+        bg: '#fef3c7',
+        border: '#fde68a',
+        badge: '#f59e0b',
+        text: '#78350f',
+        label: 'Scholarship Opportunity'
+    },
+    'FOOD STUBS': {
+        bg: '#ffedd5',
+        border: '#fdba74',
+        badge: '#f97316',
+        text: '#9a3412',
+        label: 'Food Stubs'
+    }
+};
+
 const username = localStorage.getItem("loggedInUsername");
 if (!username || username === "null") {
     handleLogout(); 
@@ -104,7 +142,17 @@ async function loadAnnouncements() {
     const container = document.getElementById('announcements-container');
     
     try {
-        const response = await fetch('/api/announcements/');
+        const accessToken = localStorage.getItem('access');
+        const response = await fetch('/api/announcements/', {
+            headers: accessToken
+                ? { Authorization: `Bearer ${accessToken}` }
+                : {},
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch announcements');
+        }
+
         const announcements = await response.json();
 
         if (!announcements || announcements.length === 0) {
@@ -114,54 +162,17 @@ async function loadAnnouncements() {
 
         const recentAnnouncements = announcements.slice(0, 2);
         
-        const categoryStyles = {
-            'URGENT': {
-                bg: '#fee2e2',
-                border: '#fecaca',
-                badge: '#ef4444',
-                text: '#7f1d1d',
-                label: 'Urgent'
-            },
-            'VOLUNTEER': {
-                bg: '#d1fae5',
-                border: '#a7f3d0',
-                badge: '#10b981',
-                text: '#064e3b',
-                label: 'Volunteer'
-            },
-            'OPPORTUNITY': {
-                bg: '#fef3c7',
-                border: '#fde68a',
-                badge: '#f59e0b',
-                text: '#78350f',
-                label: 'Opportunity'
-            },
-            'FOODSTUBS': {
-                bg: '#e9d5ff',
-                border: '#d8b4fe',
-                badge: '#a855f7',
-                text: '#581c87',
-                label: 'Food Stubs'
-            },
-            'GENERAL': {
-                bg: '#dbeafe',
-                border: '#bfdbfe',
-                badge: '#3b82f6',
-                text: '#1e3a8a',
-                label: 'General'
-            }
-        };
-
         container.innerHTML = recentAnnouncements.map(item => {
-            const style = categoryStyles[item.category] || categoryStyles['GENERAL'];
+            const style = announcementCategoryStyles[item.category]
+                || announcementCategoryStyles.GENERAL;
             
             return `
-                <a href="/api/announcements/${item.id}/" 
+                <a href="/announcements/${item.id}/" 
                    class="block p-4 rounded-xl transition hover:shadow-md"
                    style="background-color: ${style.bg}; border: 1px solid ${style.border};">
                     <span class="text-white text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block"
                           style="background-color: ${style.badge};">
-                        ${style.label}
+                        ${item.category_label || style.label}
                     </span>
                     <div class="font-bold text-sm mb-1" style="color: ${style.text};">
                         ${item.title}

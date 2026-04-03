@@ -26,6 +26,50 @@ from django.http import JsonResponse
 
 User = get_user_model()
 
+ANNOUNCEMENT_CATEGORY_STYLES = {
+    'GENERAL': {
+        'badge_classes': 'bg-blue-100 text-blue-800',
+        'tag_color': 'blue',
+    },
+    'URGENT': {
+        'badge_classes': 'bg-red-100 text-red-800',
+        'tag_color': 'red',
+    },
+    'VOLUNTEER': {
+        'badge_classes': 'bg-green-100 text-green-800',
+        'tag_color': 'green',
+    },
+    'OPPORTUNITY': {
+        'badge_classes': 'bg-yellow-100 text-yellow-800',
+        'tag_color': 'yellow',
+    },
+    'FOOD STUBS': {
+        'badge_classes': 'bg-orange-100 text-orange-800',
+        'tag_color': 'orange',
+    },
+}
+
+
+def get_announcement_category_info(category):
+    valid_categories = dict(Announcement.CATEGORY_CHOICES)
+    category_value = category if category in valid_categories else 'GENERAL'
+
+    return {
+        'value': category_value,
+        'label': valid_categories[category_value],
+        **ANNOUNCEMENT_CATEGORY_STYLES.get(
+            category_value,
+            ANNOUNCEMENT_CATEGORY_STYLES['GENERAL'],
+        ),
+    }
+
+
+def get_announcement_category_options():
+    return [
+        get_announcement_category_info(value)
+        for value, _label in Announcement.CATEGORY_CHOICES
+    ]
+
 
 def get_available_offices():
     offices = {
@@ -272,13 +316,19 @@ def get_scholar_dashboard(request):
 def get_recent_announcements(request):
     # Get 2 latest announcements
     announcements = Announcement.objects.all().order_by('-created_at')[:2]
-    data = [{
-        "id": a.id,
-        "title": a.title,
-        "content": a.content[:100], 
-        "tag_name": a.category,    
-        "tag_color": "red" if a.category == "Urgent" else "amber"
-    } for a in announcements]
+    data = []
+
+    for announcement in announcements:
+        category_info = get_announcement_category_info(announcement.category)
+        data.append({
+            "id": announcement.id,
+            "title": announcement.title,
+            "content": announcement.content[:100],
+            "category": announcement.category,
+            "category_label": category_info['label'],
+            "tag_name": category_info['label'],
+            "tag_color": category_info['tag_color'],
+        })
     
     return JsonResponse(data, safe=False)
 
@@ -587,7 +637,15 @@ def announcements_list(request):
     """List, create, update, or delete announcements"""
     
     if request.method == 'GET':
+        category = request.GET.get('category')
         announcements = Announcement.objects.all().order_by('-created_at')
+
+        if category and category.lower() != 'all':
+            valid_categories = dict(Announcement.CATEGORY_CHOICES)
+            if category not in valid_categories:
+                return Response({'error': 'Invalid announcement category.'}, status=400)
+            announcements = announcements.filter(category=category)
+
         serializer = AnnouncementSerializer(announcements, many=True)
         return Response(serializer.data)
     
@@ -641,7 +699,9 @@ def announcements_list(request):
 @login_required(login_url='/login/')
 def announcements_page(request):
     """Render announcements page"""
-    return render(request, 'announcements.html')
+    return render(request, 'announcements.html', {
+        'announcement_categories': get_announcement_category_options(),
+    })
 
 @login_required(login_url='/login/')
 def announcement_detail_view(request, announcement_id):
@@ -649,7 +709,9 @@ def announcement_detail_view(request, announcement_id):
     try:
         announcement = Announcement.objects.get(id=announcement_id)
         return render(request, 'announcement_detail.html', {
-            'announcement': announcement
+            'announcement': announcement,
+            'announcement_categories': get_announcement_category_options(),
+            'category_info': get_announcement_category_info(announcement.category),
         })
     except Announcement.DoesNotExist:
         return render(request, 'announcement_detail.html', {

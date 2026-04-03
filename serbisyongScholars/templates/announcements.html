@@ -33,31 +33,19 @@
         </div>
         
         <div class="bg-white rounded-lg shadow mb-6 p-4">
-            <div class="flex gap-2 overflow-x-auto">
-                <button onclick="filterByCategory('all')" 
+            <div id="category-filters" class="flex gap-2 overflow-x-auto">
+                <button type="button"
+                        data-category="all"
                         class="category-btn active px-4 py-2 rounded-lg bg-blue-600 text-white">
                     All
                 </button>
-                <button onclick="filterByCategory('URGENT')" 
+                {% for category in announcement_categories %}
+                <button type="button"
+                        data-category="{{ category.value }}"
                         class="category-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    Urgent
+                    {{ category.label }}
                 </button>
-                <button onclick="filterByCategory('VOLUNTEER')" 
-                        class="category-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    Volunteer Work
-                </button>
-                <button onclick="filterByCategory('OPPORTUNITY')" 
-                        class="category-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    Opportunities
-                </button>
-                <button onclick="filterByCategory('FOOD STUBS')" 
-                        class="category-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    Food Stubs
-                </button>
-                <button onclick="filterByCategory('GENERAL')" 
-                        class="category-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    General
-                </button>
+                {% endfor %}
             </div>
         </div>
 
@@ -86,11 +74,9 @@
                         <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
                         <select id="announcement-category" 
                                 class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
-                            <option value="GENERAL">General</option>
-                            <option value="URGENT">Urgent</option>
-                            <option value="VOLUNTEER">Volunteer Work</option>
-                            <option value="FOOD STUBS">Food Stubs</option>
-                            <option value="OPPORTUNITY">Opportunity</option>
+                            {% for category in announcement_categories %}
+                            <option value="{{ category.value }}">{{ category.label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     

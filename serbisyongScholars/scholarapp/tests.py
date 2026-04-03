@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from datetime import date
-from .models import User, ScholarProfile, ServiceLog, ModeratorProfile
+from .models import Announcement, User, ScholarProfile, ServiceLog, ModeratorProfile
 
 User = get_user_model()
 
@@ -315,3 +315,93 @@ class AdminModeratorTests(TestCase):
         # Verify ModeratorProfile was created
         moderator_profile = ModeratorProfile.objects.get(user=self.scholar)
         self.assertEqual(moderator_profile.office_name, 'Rizal Library')
+
+
+class AnnouncementCategoryTests(TestCase):
+    """Tests for announcement category tags and filtering."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='announcementadmin',
+            email='announcementadmin@ateneo.edu',
+            password='TestPass123!',
+            role='ADMIN',
+            is_email_verified=True
+        )
+        self.scholar = User.objects.create_user(
+            username='announcementscholar',
+            email='announcementscholar@student.ateneo.edu',
+            password='TestPass123!',
+            role='SCHOLAR',
+            is_email_verified=True
+        )
+
+        self.food_stubs_announcement = Announcement.objects.create(
+            title='Food Stub Distribution',
+            content='Claim your stubs from OAA.',
+            category='FOOD STUBS',
+            author=self.admin,
+        )
+        self.volunteer_announcement = Announcement.objects.create(
+            title='Library Volunteer Drive',
+            content='Volunteer slots are open this week.',
+            category='VOLUNTEER',
+            author=self.admin,
+        )
+
+        self.api_client = APIClient()
+        self.list_url = reverse('announcements_list')
+
+    def test_list_includes_category_labels(self):
+        self.api_client.force_authenticate(user=self.scholar)
+        response = self.api_client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        categories = {
+            item['category']: item['category_label']
+            for item in response.json()
+        }
+        self.assertEqual(categories['FOOD STUBS'], 'Food Stubs')
+        self.assertEqual(categories['VOLUNTEER'], 'Volunteer Work')
+
+    def test_list_can_be_filtered_by_category(self):
+        self.api_client.force_authenticate(user=self.scholar)
+        response = self.api_client.get(self.list_url, {'category': 'FOOD STUBS'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['id'], self.food_stubs_announcement.id)
+        self.assertEqual(data[0]['category_label'], 'Food Stubs')
+
+    def test_invalid_category_filter_returns_bad_request(self):
+        self.api_client.force_authenticate(user=self.scholar)
+        response = self.api_client.get(self.list_url, {'category': 'NOT_A_REAL_TAG'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json()['error'], 'Invalid announcement category.')
+
+    def test_admin_can_create_announcement_with_category(self):
+        self.api_client.force_authenticate(user=self.admin)
+        response = self.api_client.post(self.list_url, {
+            'title': 'Scholarship Briefing',
+            'content': 'Attend the scholarship briefing tomorrow.',
+            'category': 'OPPORTUNITY',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()['category'], 'OPPORTUNITY')
+        self.assertEqual(response.json()['category_label'], 'Scholarship Opportunity')
+
+    def test_scholar_cannot_create_announcement(self):
+        self.api_client.force_authenticate(user=self.scholar)
+        response = self.api_client.post(self.list_url, {
+            'title': 'Unauthorized post',
+            'content': 'This should fail.',
+            'category': 'GENERAL',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.json()['error'], 'Admin only')
