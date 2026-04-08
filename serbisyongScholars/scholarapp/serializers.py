@@ -146,11 +146,15 @@ class ServiceLogSerializer(serializers.ModelSerializer):
             created_by=self.context['request'].user,
             **validated_data
         )
+
 class AnnouncementSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source='author.get_full_name', read_only=True)
-    category_label = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)  
     
     class Meta:
         model = Announcement
-        fields = ['id', 'title', 'content', 'category', 'category_label', 'author_name', 'created_at', 'external_link']
-        read_only_fields = ['author', 'category_label', 'created_at']
+        fields = [
+            'id', 'title', 'content', 'category', 'status', 'status_display', 
+            'author_name', 'created_at', 'updated_at', 'external_link', 'rejection_reason'
+        ]
+        read_only_fields = ['author', 'created_at', 'updated_at', 'status']  

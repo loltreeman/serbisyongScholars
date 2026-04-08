@@ -127,30 +127,28 @@ class Announcement(models.Model):
         ('GENERAL', 'General'),
         ('URGENT', 'Urgent'),
         ('VOLUNTEER', 'Volunteer Work'),
-        ('OPPORTUNITY', 'Scholarship Opportunity'),
-        ('FOOD STUBS', 'Food Stubs'),
+        ('OPPORTUNITY', 'Opportunity'),
+        ('FOODSTUBS', 'Food Stubs'),
     ]
-
-    title = models.CharField(max_length=255)
+    
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending Approval'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+    ]
+    
+    title = models.CharField(max_length=200)
     content = models.TextField()
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='GENERAL', db_index=True)
-
-    # Who posted it (usually an Admin or Moderator)
-    author = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role__in': ['ADMIN', 'MODERATOR']}, related_name='announcements')
-
-    # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='GENERAL')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='APPROVED')  # ✅ default='APPROVED' for existing records
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='announcements')
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    # Optional: Link to an external form or PDF
     external_link = models.URLField(blank=True, null=True)
-
+    rejection_reason = models.TextField(blank=True, null=True)
+    
+    def __str__(self):
+        return f"{self.title} ({self.get_status_display()})"
+    
     class Meta:
         ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['category', '-created_at']),
-            models.Index(fields=['author']),
-        ]
-
-    def __str__(self):
-        return f"[{self.category}] {self.title}"

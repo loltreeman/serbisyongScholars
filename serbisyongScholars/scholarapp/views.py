@@ -324,21 +324,15 @@ def get_scholar_dashboard(request):
         return Response({'error': 'Scholar profile not found for this user'}, status=404)
 
 def get_recent_announcements(request):
-    # Get 2 latest announcements
-    announcements = Announcement.objects.all().order_by('-created_at')[:2]
-    data = []
-
-    for announcement in announcements:
-        category_info = get_announcement_category_info(announcement.category)
-        data.append({
-            "id": announcement.id,
-            "title": announcement.title,
-            "content": announcement.content[:100],
-            "category": announcement.category,
-            "category_label": category_info['label'],
-            "tag_name": category_info['label'],
-            "tag_color": category_info['tag_color'],
-        })
+    # Only show approved announcements to the general public/dashboard
+    announcements = Announcement.objects.filter(status='APPROVED').order_by('-created_at')[:2]
+    data = [{
+        "id": a.id,
+        "title": a.title,
+        "content": a.content[:100], 
+        "tag_name": a.category,    
+        "tag_color": "red" if a.category == "Urgent" else "amber"
+    } for a in announcements]
     
     return JsonResponse(data, safe=False)
 
@@ -674,34 +668,39 @@ def announcements_list(request):
     """List, create, update, or delete announcements"""
     
     if request.method == 'GET':
-        category = request.GET.get('category')
-        announcements = Announcement.objects.all().order_by('-created_at')
-
-        if category and category.lower() != 'all':
-            valid_categories = dict(Announcement.CATEGORY_CHOICES)
-            if category not in valid_categories:
-                return Response({'error': 'Invalid announcement category.'}, status=400)
-            announcements = announcements.filter(category=category)
-
+        # Scholars: Only see APPROVED announcements
+        # Moderators: See APPROVED + their own PENDING/REJECTED announcements
+        # Admins: See ALL announcements
+        if request.user.role == 'ADMIN':
+            announcements = Announcement.objects.all().order_by('-created_at')
+        elif request.user.role == 'MODERATOR':
+            # Moderators see: approved announcements + ALL their own announcements (pending/rejected)
+            announcements = Announcement.objects.filter(
+                Q(status='APPROVED') | Q(author=request.user)
+            ).order_by('-created_at')
+        else:  # SCHOLAR
+            announcements = Announcement.objects.filter(status='APPROVED').order_by('-created_at')
+        
         serializer = AnnouncementSerializer(announcements, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
-        # Only admins can create
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin only'}, status=403)
+        # Both ADMIN and MODERATOR can create announcements
+        if request.user.role not in ['ADMIN', 'MODERATOR']:
+            return Response({'error': 'Only admins and moderators can create announcements'}, status=403)
         
         serializer = AnnouncementSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(author=request.user)
+            # ADMIN posts go live immediately, MODERATOR posts need approval
+            if request.user.role == 'ADMIN':
+                serializer.save(author=request.user, status='APPROVED')
+            else:  # MODERATOR
+                serializer.save(author=request.user, status='PENDING')
+            
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
     
     elif request.method == 'PUT':
-        # Only admins can edit
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin only'}, status=403)
-        
         announcement_id = request.data.get('id')
         if not announcement_id:
             return Response({'error': 'Announcement ID required'}, status=400)
@@ -711,6 +710,16 @@ def announcements_list(request):
         except Announcement.DoesNotExist:
             return Response({'error': 'Announcement not found'}, status=404)
         
+        # MODERATOR can only edit their own PENDING announcements
+        # ADMIN can edit any announcement
+        if request.user.role == 'MODERATOR':
+            if announcement.author != request.user:
+                return Response({'error': 'You can only edit your own announcements'}, status=403)
+            if announcement.status != 'PENDING':
+                return Response({'error': 'You can only edit pending announcements'}, status=403)
+        elif request.user.role != 'ADMIN':
+            return Response({'error': 'Unauthorized'}, status=403)
+        
         serializer = AnnouncementSerializer(announcement, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -718,22 +727,55 @@ def announcements_list(request):
         return Response(serializer.errors, status=400)
     
     elif request.method == 'DELETE':
-        # Only admins can delete
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin only'}, status=403)
-        
         announcement_id = request.data.get('id') or request.GET.get('id')
         if not announcement_id:
             return Response({'error': 'Announcement ID required'}, status=400)
         
         try:
             announcement = Announcement.objects.get(id=announcement_id)
-            announcement.delete()
-            return Response({'message': 'Announcement deleted successfully'}, status=200)
         except Announcement.DoesNotExist:
             return Response({'error': 'Announcement not found'}, status=404)
+        
+        # MODERATOR can only delete their own PENDING announcements
+        # ADMIN can delete any announcement
+        if request.user.role == 'MODERATOR':
+            if announcement.author != request.user:
+                return Response({'error': 'You can only delete your own announcements'}, status=403)
+            if announcement.status != 'PENDING':
+                return Response({'error': 'You can only delete pending announcements'}, status=403)
+        elif request.user.role != 'ADMIN':
+            return Response({'error': 'Unauthorized'}, status=403)
+        
+        announcement.delete()
+        return Response({'message': 'Announcement deleted successfully'}, status=200)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def approve_announcement(request, announcement_id):
+    """Admin approves or rejects a pending announcement"""
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin only'}, status=403)
     
-@login_required(login_url='/login/')
+    action = request.data.get('action')  
+    rejection_reason = request.data.get('rejection_reason', '')
+    
+    try:
+        announcement = Announcement.objects.get(id=announcement_id)
+    except Announcement.DoesNotExist:
+        return Response({'error': 'Announcement not found'}, status=404)
+    
+    if action == 'approve':
+        announcement.status = 'APPROVED'
+        announcement.save()
+        return Response({'message': 'Announcement approved'}, status=200)
+    elif action == 'reject':
+        announcement.status = 'REJECTED'
+        announcement.rejection_reason = rejection_reason
+        announcement.save()
+        return Response({'message': 'Announcement rejected'}, status=200)
+    else:
+        return Response({'error': 'Invalid action'}, status=400)
+  
 def announcements_page(request):
     """Render announcements page"""
     return render(request, 'announcements.html', {
@@ -764,3 +806,11 @@ def dashboard_router(request):
         return redirect('moderator_dashboard')  
     else:  
         return redirect('scholar_dashboard')
+
+@login_required(login_url='/login/')
+def manage_announcements_view(request):
+    """Render the management page for Admins/Moderators"""
+    if request.user.role not in ['ADMIN', 'MODERATOR']:
+        return HttpResponseForbidden("You do not have permission to manage announcements.")
+    
+    return render(request, 'manage_announcements.html')

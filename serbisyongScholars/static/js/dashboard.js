@@ -163,29 +163,29 @@ async function loadAnnouncements() {
         const recentAnnouncements = announcements.slice(0, 2);
         
         container.innerHTML = recentAnnouncements.map(item => {
-            const style = announcementCategoryStyles[item.category]
-                || announcementCategoryStyles.GENERAL;
-            
-            return `
-                <a href="/announcements/${item.id}/" 
-                   class="block p-4 rounded-xl transition hover:shadow-md"
-                   style="background-color: ${style.bg}; border: 1px solid ${style.border};">
-                    <span class="text-white text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block"
-                          style="background-color: ${style.badge};">
-                        ${item.category_label || style.label}
-                    </span>
-                    <div class="font-bold text-sm mb-1" style="color: ${style.text};">
-                        ${item.title}
-                    </div>
-                    <p class="text-xs leading-relaxed opacity-80 line-clamp-2" style="color: ${style.text};">
-                        ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}
-                    </p>
-                    <span class="text-xs font-bold mt-2 inline-block hover:underline" style="color: ${style.badge};">
-                        Read More →
-                    </span>
-                </a>
-            `;
-        }).join('');
+    const style = categoryStyles[item.category] || categoryStyles['GENERAL'];
+    
+    return `
+        <a href="/api/announcements/${item.id}/" 
+           class="block p-4 rounded-xl transition hover:shadow-md"
+           style="background-color: ${style.bg}; border: 1px solid ${style.border};">
+            <span class="text-white text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block"
+                  style="background-color: ${style.badge};">
+                ${style.label}
+            </span>
+            <div class="font-bold text-sm mb-1" style="color: ${style.text};">
+                ${item.title}
+            </div>
+            <p class="text-xs leading-relaxed opacity-80 line-clamp-2" style="color: ${style.text};">
+                ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}
+            </p>
+            <span class="text-xs font-bold mt-2 inline-block hover:underline" style="color: ${style.badge};">
+                Read More →
+            </span>
+        </a>
+    `;
+}).join('');
+
 
     } catch (error) {
         console.error('Error fetching announcements:', error);
