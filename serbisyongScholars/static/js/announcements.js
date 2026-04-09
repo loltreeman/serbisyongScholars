@@ -134,8 +134,7 @@ function createAnnouncementCard(announcement) {
     if (userRole === 'ADMIN') {
         showStatusBadge = true; // Admins see status on ALL posts
     } else if (userRole === 'MODERATOR') {
-        const isAuthor = announcement.author_name && announcement.author_name.toLowerCase().includes(currentUser.toLowerCase());
-        // Show badge if they are the author OR if it's already approved/rejected
+        const isAuthor = announcement.author_username && announcement.author_username.toLowerCase() === currentUser.toLowerCase();
         if (isAuthor) {
             showStatusBadge = true;
         }
@@ -145,7 +144,7 @@ function createAnnouncementCard(announcement) {
     let showActions = false;
     if (userRole === 'ADMIN') {
         showActions = true;
-    } else if (userRole === 'MODERATOR' && announcement.author_name.toLowerCase().includes(currentUser.toLowerCase()) && announcement.status === 'PENDING') {
+    } else if (userRole === 'MODERATOR' && announcement.author_username && announcement.author_username.toLowerCase() === currentUser.toLowerCase() && announcement.status === 'PENDING') {
         showActions = true;
     }
     
