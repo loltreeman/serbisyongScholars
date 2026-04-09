@@ -15,19 +15,33 @@
         <h1 class="text-3xl font-bold mb-8">Manage Announcements</h1>
         
         <div class="bg-white rounded-lg shadow mb-6">
-            <div class="flex border-b">
-                <button onclick="filterByStatus('PENDING')" 
-                        class="status-tab px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600">
-                    Pending
-                </button>
-                <button onclick="filterByStatus('APPROVED')" 
-                        class="status-tab px-6 py-3 font-semibold text-gray-500 hover:text-gray-700">
-                    Approved
-                </button>
-                <button onclick="filterByStatus('REJECTED')" 
-                        class="status-tab px-6 py-3 font-semibold text-gray-500 hover:text-gray-700">
-                    Rejected
-                </button>
+            <div class="flex flex-col md:flex-row justify-between items-center p-2 gap-4">
+                <div class="flex border-b w-full md:w-auto">
+                    <button onclick="filterByStatus('PENDING')" 
+                            class="status-tab px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600">
+                        Pending
+                    </button>
+                    <button onclick="filterByStatus('APPROVED')" 
+                            class="status-tab px-6 py-3 font-semibold text-gray-500 hover:text-gray-700">
+                        Approved
+                    </button>
+                    <button onclick="filterByStatus('REJECTED')" 
+                            class="status-tab px-6 py-3 font-semibold text-gray-500 hover:text-gray-700">
+                        Rejected
+                    </button>
+                </div>
+                
+                <div class="relative w-full md:w-64 px-4 md:px-0">
+                    <input type="text" 
+                           id="search-manage-announcements" 
+                           placeholder="Search management..." 
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <div class="absolute left-7 md:left-3 top-2.5 text-gray-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
         

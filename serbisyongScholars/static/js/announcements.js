@@ -32,9 +32,19 @@ const CATEGORY_INFO = {
 // Load announcements on page load
 document.addEventListener('DOMContentLoaded', function() {
     bindCategoryFilters();
+    bindSearchFilter();
     loadAnnouncements();
     checkUserRole();
 });
+
+function bindSearchFilter() {
+    const searchInput = document.getElementById('search-announcements');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            applyCurrentFilter();
+        });
+    }
+}
 
 /**
  * Check if user is admin to show create button
@@ -267,9 +277,19 @@ function setActiveCategoryButton(category) {
 function applyCurrentFilter() {
     let filteredAnnouncements = allAnnouncements;
 
+    // Filter by category
     if (currentFilter !== 'all') {
         filteredAnnouncements = allAnnouncements.filter(
             (announcement) => announcement.category === currentFilter
+        );
+    }
+
+    // Filter by search term
+    const searchTerm = document.getElementById('search-announcements')?.value.toLowerCase().trim();
+    if (searchTerm) {
+        filteredAnnouncements = filteredAnnouncements.filter(a => 
+            a.title.toLowerCase().includes(searchTerm) || 
+            a.content.toLowerCase().includes(searchTerm)
         );
     }
 

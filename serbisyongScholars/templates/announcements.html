@@ -25,19 +25,33 @@
         </div>
         
         <div class="bg-white rounded-lg shadow mb-6 p-4">
-            <div id="category-filters" class="flex gap-2 overflow-x-auto">
-                <button type="button"
-                        data-category="all"
-                        class="category-btn active px-4 py-2 rounded-lg bg-blue-600 text-white">
-                    All
-                </button>
-                {% for category in announcement_categories %}
-                <button type="button"
-                        data-category="{{ category.value }}"
-                        class="category-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    {{ category.label }}
-                </button>
-                {% endfor %}
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div id="category-filters" class="flex gap-2 overflow-x-auto w-full md:w-auto">
+                    <button type="button"
+                            data-category="all"
+                            class="category-btn active px-4 py-2 rounded-lg bg-blue-600 text-white flex-shrink-0">
+                        All
+                    </button>
+                    {% for category in announcement_categories %}
+                    <button type="button"
+                            data-category="{{ category.value }}"
+                            class="category-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 flex-shrink-0">
+                        {{ category.label }}
+                    </button>
+                    {% endfor %}
+                </div>
+                
+                <div class="relative w-full md:w-64">
+                    <input type="text" 
+                           id="search-announcements" 
+                           placeholder="Search announcements..." 
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <div class="absolute left-3 top-2.5 text-gray-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                </div>
             </div>
         </div>
 

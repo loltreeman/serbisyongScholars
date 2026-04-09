@@ -28,7 +28,17 @@ function filterByStatus(status) {
         }
     });
     
-    const filtered = allAnnouncements.filter(a => a.status === status);
+    let filtered = allAnnouncements.filter(a => a.status === status);
+
+    // Apply search filter
+    const searchTerm = document.getElementById('search-manage-announcements')?.value.toLowerCase().trim();
+    if (searchTerm) {
+        filtered = filtered.filter(a => 
+            a.title.toLowerCase().includes(searchTerm) || 
+            a.content.toLowerCase().includes(searchTerm)
+        );
+    }
+
     renderAnnouncements(filtered);
 }
 
@@ -123,4 +133,13 @@ async function rejectAnnouncement(id) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', loadAnnouncements);
+document.addEventListener('DOMContentLoaded', () => {
+    loadAnnouncements();
+    
+    const searchInput = document.getElementById('search-manage-announcements');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            filterByStatus(currentStatus);
+        });
+    }
+});
