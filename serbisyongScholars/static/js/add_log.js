@@ -1,10 +1,184 @@
-function getCookie(name) {
-    const cookieValue = `; ${document.cookie}`;
-    const parts = cookieValue.split(`; ${name}=`);
-    if (parts.length === 2) {
-        return parts.pop().split(';').shift();
+// Execute initialization
+(function() {
+    console.log('Add Log script starting...');
+    
+    // Safety check: if no token, the API will fail anyway, so redirect to login
+    if (!localStorage.getItem('access')) {
+        console.warn('No access token found, redirecting to login...');
+        window.location.href = '/login/';
+        return;
     }
+
+    // Setup initialization on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+})();
+
+function initialize() {
+    console.log('Initializing Add Log page features...');
+    loadOffices();
+    setupStudentIdListener();
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
     return null;
+}
+
+async function loadOffices() {
+    const officeSelect = document.getElementById('office');
+    if (!officeSelect) return;
+
+    const token = localStorage.getItem('access');
+    const userRole = localStorage.getItem('userRole');
+    
+    console.log('Fetching offices...');
+
+    try {
+        const response = await fetch('/api/offices/', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const offices = await response.json();
+        console.log('Offices loaded:', offices);
+
+        officeSelect.innerHTML = '<option value="">Select an office</option>';
+        offices.forEach(office => {
+            const option = document.createElement('option');
+            option.value = office.name;
+            option.textContent = office.name;
+            officeSelect.appendChild(option);
+        });
+
+        // Special handling for Moderators
+        if (userRole === 'MODERATOR') {
+            await lockModeratorOffice(officeSelect, token);
+        }
+    } catch (err) {
+        console.error('loadOffices failed:', err);
+        officeSelect.innerHTML = '<option value="">Error loading offices. Refresh page.</option>';
+    }
+}
+
+async function lockModeratorOffice(officeSelect, token) {
+    const loggedInUsername = localStorage.getItem('loggedInUsername');
+    if (!loggedInUsername) return;
+
+    try {
+        const response = await fetch(`/api/profile/?username=${loggedInUsername}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const profile = await response.json();
+            if (profile.assigned_office) {
+                officeSelect.value = profile.assigned_office;
+                officeSelect.disabled = true;
+                console.log('Locked to office:', profile.assigned_office);
+            }
+        }
+    } catch (err) {
+        console.error('lockModeratorOffice failed:', err);
+    }
+}
+
+function setupStudentIdListener() {
+    const studentIdInput = document.getElementById('student-id');
+    const previewPane = document.getElementById('scholar-preview');
+    if (!studentIdInput || !previewPane) {
+        console.warn('Student ID input or Preview pane element missing from DOM');
+        return;
+    }
+
+    let debounceTimer;
+    
+    const onInput = () => {
+        const studentId = studentIdInput.value.trim();
+        clearTimeout(debounceTimer);
+        
+        if (studentId.length === 6) {
+            previewPane.classList.remove('hidden');
+            // Show loading state in preview
+            document.getElementById('preview-name').textContent = 'Searching...';
+            document.getElementById('preview-program').textContent = 'Please wait...';
+            
+            debounceTimer = setTimeout(() => fetchScholarPreview(studentId), 300);
+        } else {
+            previewPane.classList.add('hidden');
+        }
+    };
+
+    studentIdInput.addEventListener('input', onInput);
+    if (studentIdInput.value.length === 6) onInput();
+}
+
+async function fetchScholarPreview(studentId) {
+    const nameEl = document.getElementById('preview-name');
+    const programEl = document.getElementById('preview-program');
+    const renderedEl = document.getElementById('preview-rendered');
+    const requiredEl = document.getElementById('preview-required');
+    const initialsEl = document.getElementById('preview-initials');
+    const token = localStorage.getItem('access');
+    const submitBtn = document.getElementById('submit-btn');
+
+    try {
+        const response = await fetch(`/api/profile/?student_id=${studentId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Scholar not found');
+
+        const data = await response.json();
+        
+        nameEl.textContent = data.name || 'Unknown Name';
+        programEl.textContent = data.course_department || 'No Program Info';
+        
+        // Block encoding for Moderators
+        if (data.role === 'MODERATOR') {
+            nameEl.textContent += ' (MODERATOR)';
+            nameEl.classList.add('text-red-600');
+            programEl.textContent = 'User is currently a Moderator. Hours cannot be encoded.';
+            programEl.classList.add('text-red-500', 'font-bold');
+            if (submitBtn) submitBtn.disabled = true;
+            renderedEl.textContent = 'N/A';
+            requiredEl.textContent = 'N/A';
+            showFieldError('student-id-error', 'Cannot encode hours for a Moderator.');
+        } else {
+            nameEl.classList.remove('text-red-600');
+            programEl.classList.remove('text-red-500', 'font-bold');
+            if (submitBtn) submitBtn.disabled = false;
+            renderedEl.textContent = `${data.total_hours_rendered || 0} hrs`;
+            requiredEl.textContent = `${data.required_hours || 0} hrs`;
+            document.getElementById('student-id-error').classList.add('hidden');
+        }
+        
+        // Robust initials extraction
+        const nameParts = (data.name || 'S').trim().split(/\s+/);
+        let initials = '?';
+        if (nameParts.length >= 2) {
+            initials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+        } else if (nameParts.length === 1 && nameParts[0].length > 0) {
+            initials = nameParts[0][0].toUpperCase();
+        }
+        initialsEl.textContent = initials;
+    } catch (err) {
+        console.error('Scholar lookup failed:', err);
+        nameEl.textContent = 'Scholar Not Found';
+        programEl.textContent = 'Double check the Student ID';
+        initialsEl.textContent = '??';
+        renderedEl.textContent = '---';
+        requiredEl.textContent = '---';
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
 
 async function submitLog() {
@@ -14,125 +188,113 @@ async function submitLog() {
     const studentId = document.getElementById('student-id').value.trim();
     const dateRendered = document.getElementById('date-rendered').value;
     const hours = document.getElementById('hours').value;
-    const office = document.getElementById('office').value.trim();
+    const officeSelect = document.getElementById('office');
+    const office = officeSelect.value;
     const activity = document.getElementById('activity').value.trim();
 
-    let hasErrors = false;
+    let valid = true;
 
-    // check for input errors
-    if (!studentId) {
-        showFieldError('student-id-error', 'Student ID is required.');
-        hasErrors = true;
-    } else if (studentId.length !== 6) {
-        showFieldError('student-id-error', 'Student ID must be exactly 6 characters.');
-        hasErrors = true;
+    if (!studentId || studentId.length !== 6) {
+        showFieldError('student-id-error', 'Valid 6-digit Student ID required.');
+        valid = false;
     }
-
     if (!dateRendered) {
         showFieldError('date-error', 'Date is required.');
-        hasErrors = true;
+        valid = false;
     }
-
-    if (!hours) {
-        showFieldError('hours-error', 'Number of hours is required.');
-        hasErrors = true;
-    } else if (parseFloat(hours) < 0.5) {
-        showFieldError('hours-error', 'Minimum is 0.5 hours.');
-        hasErrors = true;
-    } else if (parseFloat(hours) > 24) {
-        showFieldError('hours-error', 'A single log cannot exceed 24 hours.');
-        hasErrors = true;
+    if (!hours || parseFloat(hours) <= 0) {
+        showFieldError('hours-error', 'Hours must be greater than 0.');
+        valid = false;
     }
-
     if (!office) {
-        showFieldError('office-error', 'Office is required.');
-        hasErrors = true;
+        showFieldError('office-error', 'Please select an office.');
+        valid = false;
     }
-
     if (!activity) {
-        showFieldError('activity-error', 'Activity description is required.');
-        hasErrors = true;
+        showFieldError('activity-error', 'Description is required.');
+        valid = false;
     }
 
-    if (hasErrors) return;
+    if (!valid) return;
 
-    // Disable button while submitting
     setLoading(true);
 
     try {
         const response = await fetch('/api/logs/create/', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access')}`,
-            'X-CSRFToken': getCookie('csrftoken') || ''
-        },
-        body: JSON.stringify({
-            student_id: studentId,
-            date_rendered: dateRendered,
-            hours: parseFloat(hours),
-            office_name: office,
-            activity_description: activity
-        })
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': getCookie('csrftoken') || ''
+            },
+            body: JSON.stringify({
+                student_id: studentId,
+                date_rendered: dateRendered,
+                hours: parseFloat(hours),
+                office_name: office,
+                activity_description: activity
+            })
         });
 
-        const data = await response.json();
+        const result = await response.json();
 
         if (response.ok) {
             showMessage('Service log added successfully!', true);
-            setTimeout(() => {
-                resetForm();
-            }, 2000);
+            setTimeout(clearForm, 2000);
         } else {
-            const errorMessages = Object.values(data).flat().join(' ');
-            showMessage(errorMessages || 'Failed to add service log.', false);
+            const msg = typeof result === 'object' ? Object.values(result).flat().join(' ') : 'Error adding log';
+            showMessage(msg, false);
         }
     } catch (err) {
-        console.error('Submit error:', err);
-        showError('Connection error. Please try again.');
+        console.error('Submission failed:', err);
+        showMessage('Connection error. Please try again.', false);
     } finally {
         setLoading(false);
     }
 }
 
-// reset entry form
-function resetForm() {
+function clearForm() {
     document.getElementById('student-id').value = '';
     document.getElementById('date-rendered').value = '';
     document.getElementById('hours').value = '';
     document.getElementById('office').value = '';
     document.getElementById('activity').value = '';
+    
+    const preview = document.getElementById('scholar-preview');
+    if (preview) preview.classList.add('hidden');
+    
     clearErrors();
     hideMessages();
 }
 
-function showFieldError(elementId, message) {
-    const el = document.getElementById(elementId);
-    el.textContent = message;
-    el.classList.remove('hidden');
+// Helpers
+function showFieldError(id, msg) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
 }
 
 function clearErrors() {
     ['student-id-error', 'date-error', 'hours-error', 'office-error', 'activity-error'].forEach(id => {
         const el = document.getElementById(id);
-        el.textContent = '';
-        el.classList.add('hidden');
+        if (el) el.classList.add('hidden');
     });
 }
 
-// show successful log or error in inputs
 function showMessage(text, isSuccess) {
-    const messageBox = document.getElementById('success-message');
+    const successBox = document.getElementById('success-message');
     const errorBox = document.getElementById('error-message');
+    const errorText = document.getElementById('error-text');
     
     if (isSuccess) {
-        messageBox.classList.remove('hidden');
+        successBox.classList.remove('hidden');
         errorBox.classList.add('hidden');
     } else {
         errorBox.classList.remove('hidden');
-        messageBox.classList.add('hidden');
-        document.getElementById('error-text').textContent = text;
+        successBox.classList.add('hidden');
+        if (errorText) errorText.textContent = text;
     }
 }
 
@@ -141,9 +303,13 @@ function hideMessages() {
     document.getElementById('error-message').classList.add('hidden');
 }
 
-function setLoading(isLoading) {
+function setLoading(loading) {
     const btn = document.getElementById('submit-btn');
-    btn.disabled = isLoading;
-    btn.textContent = isLoading ? 'Submitting...' : 'Add Service Log';
-    btn.classList.toggle('opacity-60', isLoading);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.textContent = loading ? 'Processing...' : 'Add Service Log';
 }
+
+// Make globally available for onclick
+window.submitLog = submitLog;
+window.clearForm = clearForm;

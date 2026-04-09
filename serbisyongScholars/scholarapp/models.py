@@ -4,6 +4,15 @@ from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
+class Office(models.Model):
+    name = models.CharField(max_length=200, unique=True, db_index=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
 class User(AbstractUser):
     ROLE_CHOICES = [
         ('SCHOLAR', 'Scholar'),

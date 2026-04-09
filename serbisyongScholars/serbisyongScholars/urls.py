@@ -31,7 +31,7 @@ urlpatterns = [
     path('verify/', TemplateView.as_view(template_name='verify.html'), name='verify'),
     path('profile/', scholar_views.profile_page, name='profile'),
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
-    path('encode/', TemplateView.as_view(template_name='add_log.html'), name='add_log'),
+    path('encode/', scholar_views.add_log_page, name='add_log'),
     path('announcements/', scholar_views.announcements_page, name='announcements_bulletin'),
     path('announcements/<int:announcement_id>/', scholar_views.announcement_detail_view, name='announcement_page'),
 ]

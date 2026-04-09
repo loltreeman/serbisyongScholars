@@ -21,4 +21,7 @@ urlpatterns = [
     path('admin/assign-moderator/', views.assign_moderator, name='assign_moderator'),
     path('admin/search-users/', views.search_users, name='search_users'),
     path('logs/create/', views.create_service_log, name='api_create_log'),
+    path('offices/', views.offices_list_create, name='api_offices'),
+    path('offices/<int:office_id>/', views.office_detail, name='api_office_detail'),
+    path('admin/remove-moderator/', views.remove_moderator, name='api_remove_moderator'),
 ]
