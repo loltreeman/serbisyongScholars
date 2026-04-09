@@ -32,7 +32,7 @@ const announcementCategoryStyles = {
         text: '#78350f',
         label: 'Scholarship Opportunity'
     },
-    'FOOD STUBS': {
+    FOODSTUBS: {
         bg: '#ffedd5',
         border: '#fdba74',
         badge: '#f97316',
@@ -163,7 +163,7 @@ async function loadAnnouncements() {
         const recentAnnouncements = announcements.slice(0, 2);
         
         container.innerHTML = recentAnnouncements.map(item => {
-    const style = categoryStyles[item.category] || categoryStyles['GENERAL'];
+    const style = announcementCategoryStyles[item.category] || announcementCategoryStyles['GENERAL'];
     
     return `
         <a href="/api/announcements/${item.id}/" 

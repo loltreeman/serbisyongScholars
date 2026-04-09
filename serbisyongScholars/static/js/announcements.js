@@ -22,7 +22,7 @@ const CATEGORY_INFO = {
         bgColor: 'bg-yellow-100',
         textColor: 'text-yellow-800'
     },
-    'FOOD STUBS': {
+    FOODSTUBS: {
         label: 'Food Stubs',
         bgColor: 'bg-orange-100',
         textColor: 'text-orange-800'
