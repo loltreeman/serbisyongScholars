@@ -180,7 +180,7 @@ async function loadAnnouncements() {
                 ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}
             </p>
             <span class="text-xs font-bold mt-2 inline-block hover:underline" style="color: ${style.badge};">
-                Read More →
+                Read More
             </span>
         </a>
     `;
