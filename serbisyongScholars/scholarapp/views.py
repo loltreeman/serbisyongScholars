@@ -101,6 +101,8 @@ def get_available_offices():
 
 # Register a new user by default it is a scholar
 @api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
 def signup(request):
     serializer = RegistrationSerializer(data=request.data)
     if serializer.is_valid():
