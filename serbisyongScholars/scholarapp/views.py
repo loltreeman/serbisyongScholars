@@ -654,6 +654,32 @@ def create_service_log(request):
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_dormer_status(request):
+    # Checks if user is ADMIN
+    if request.user.role not in ['ADMIN']:
+        return Response({'error': 'Admin access required'}, status=403)
+
+    student_id = request.data.get('student_id')
+    is_dormer = request.data.get('is_dormer')
+
+    if student_id is None or is_dormer is None:
+        return Response({'error': 'student_id and is_dormer are required'}, status=400)
+
+    try:
+        scholar = ScholarProfile.objects.get(student_id=student_id)
+        scholar.is_dormer = is_dormer
+        scholar.save()
+        # Update dormer status and required hours to match
+        return Response({
+            'message': 'Dormer status updated successfully.',
+            'is_dormer': scholar.is_dormer,
+            'required_hours': scholar.required_hours
+        })
+    except ScholarProfile.DoesNotExist:
+        return Response({'error': 'Scholar not found'}, status=404)
+
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def announcements_list(request):

@@ -16,6 +16,15 @@ if (!profileIdentifier) {
     container.innerHTML = '<div class="empty-state p-6 text-center text-slate-500">No user specified. Please log in or provide username/student_id.</div>';
 }
 
+function getCookie(name) {
+    const cookieValue = `; ${document.cookie}`;
+    const parts = cookieValue.split(`; ${name}=`);
+    if (parts.length === 2) {
+        return parts.pop().split(';').shift();
+    }
+    return null;
+}
+
 async function loadProfile() {
     try {
         // Build API URL based on what parameter we have
@@ -39,6 +48,54 @@ async function loadProfile() {
         renderProfile(data);
     } catch (err) {
         container.innerHTML = '<div class="empty-state p-6 text-center text-red-500">❌ Connection Error</div>';
+    }
+}
+
+// Change dormer status (as an ADMIN account)
+async function toggleDormer(studentId, currentStatus) {
+    const statusEl = document.getElementById('dormer-status');
+    const toggleBtn = document.getElementById('dormer-toggle');
+    const badge = document.getElementById('dormer-badge');
+
+    statusEl.textContent = 'Saving...';
+    statusEl.className = 'text-xs font-medium text-slate-500';
+    toggleBtn.disabled = true;
+
+    try {
+        const res = await fetch('/api/scholar/update-dormer/', {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': getCookie('csrftoken') || ''
+            },
+            body: JSON.stringify({
+                student_id: studentId,
+                is_dormer: !currentStatus
+            })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            const newStatus = !currentStatus;
+            badge.textContent = newStatus ? 'Dormer (15 hrs)' : 'Non-Dormer (10 hrs)';
+            badge.className = 'inline-block bg-gray-100 text-gray-800 text-xs font-bold px-2 py-1 rounded-md';
+            toggleBtn.textContent = `Switch to ${newStatus ? 'Non-Dormer' : 'Dormer'}`;
+            toggleBtn.onclick = () => toggleDormer(studentId, newStatus);
+            statusEl.textContent = 'Updated successfully.';
+            statusEl.className = 'text-xs font-medium text-emerald-600';
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        } else {
+            statusEl.textContent = data.error || 'Update failed.';
+            statusEl.className = 'text-xs font-medium text-red-600';
+        }
+    } catch (err) {
+        statusEl.textContent = 'Connection error.';
+        statusEl.className = 'text-xs font-medium text-red-600';
+    } finally {
+        toggleBtn.disabled = false;
     }
 }
 
@@ -84,9 +141,22 @@ function renderProfile(data) {
                 ${data.role === 'SCHOLAR' ? `
                 <div>
                     <p class="text-xs text-slate-500 mb-1">Dormer Status</p>
-                    <span class="inline-block ${data.is_dormer ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'} text-xs font-bold px-2 py-1 rounded-md">
-                        ${data.is_dormer ? 'Dormer (15 hrs)' : 'Non-Dormer (10 hrs)'}
-                    </span>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <span id="dormer-badge" class="inline-block bg-gray-100 text-gray-800 text-xs font-bold px-2 py-1 rounded-md">
+                            ${data.is_dormer ? 'Dormer (15 hrs)' : 'Non-Dormer (10 hrs)'}
+                        </span>
+
+                        <!-- display button to change dormer status if ADMIN user --> 
+                        ${currentUserRole === 'ADMIN' ? `
+                        <button
+                            id="dormer-toggle"
+                            onclick="toggleDormer('${data.student_id}', ${data.is_dormer})"
+                            class="text-xs font-semibold px-3 py-1 rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 transition">
+                            Switch to ${data.is_dormer ? 'Non-Dormer' : 'Dormer'}
+                        </button>
+                        <span id="dormer-status" class="text-xs font-medium"></span>
+                        ` : ''}
+                    </div>
                 </div>
                 ` : ''}
             </div>
