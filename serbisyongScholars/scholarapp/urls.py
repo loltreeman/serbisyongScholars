@@ -24,4 +24,5 @@ urlpatterns = [
     path('offices/', views.offices_list_create, name='api_offices'),
     path('offices/<int:office_id>/', views.office_detail, name='api_office_detail'),
     path('admin/remove-moderator/', views.remove_moderator, name='api_remove_moderator'),
+    path('scholar/update-dormer/', views.update_dormer_status, name='update_dormer'),
 ]
