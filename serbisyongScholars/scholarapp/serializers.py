@@ -134,7 +134,11 @@ class ServiceLogSerializer(serializers.ModelSerializer):
         return value
 
     def validate_student_id(self, value):
-        if not ScholarProfile.objects.filter(student_id=value).exists():
+        try:
+            scholar = ScholarProfile.objects.get(student_id=value)
+            if scholar.user.role != 'SCHOLAR':
+                raise serializers.ValidationError(f"Cannot encode hours for a {scholar.user.get_role_display()}. Only scholars can have service logs.")
+        except ScholarProfile.DoesNotExist:
             raise serializers.ValidationError("No scholar found with that student ID.")
         return value
     

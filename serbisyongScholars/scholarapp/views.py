@@ -20,7 +20,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
-from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile
+from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office
 from django.http import JsonResponse
 
 
@@ -82,25 +82,16 @@ def get_scholar_status(rendered, required):
 
 
 def get_available_offices():
-    offices = {
-        office_name.strip()
-        for office_name in ServiceLog.objects.exclude(office_name__isnull=True)
-        .exclude(office_name__exact='')
-        .values_list('office_name', flat=True)
-        if office_name and office_name.strip()
-    }
-    offices.update(
-        office_name.strip()
-        for office_name in ModeratorProfile.objects.exclude(office_name__isnull=True)
-        .exclude(office_name__exact='')
-        .values_list('office_name', flat=True)
-        if office_name and office_name.strip()
-    )
-    offices.add('Office of Admission and Aid')
+    # Deprecated fallback since we have an Office model now, but kept for legacy UI compatibility 
+    # anywhere it's still specifically imported. Now it prefers Office model.
+    offices = set(Office.objects.values_list('name', flat=True))
     return sorted(offices, key=str.casefold)
+
 
 # Register a new user by default it is a scholar
 @api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
 def signup(request):
     serializer = RegistrationSerializer(data=request.data)
     if serializer.is_valid():
@@ -504,6 +495,7 @@ def user_profile(request):
             return Response({'error': 'User not found'}, status=404)
 
     scholar = getattr(user, 'scholar_profile', None)
+    moderator = getattr(user, 'moderator_profile', None)
 
     if request.method == 'GET':
         data = {
@@ -518,7 +510,7 @@ def user_profile(request):
             'required_hours': getattr(scholar, 'required_hours', 10),
             'carry_over_hours': getattr(scholar, 'carry_over_hours', 0),
             'is_dormer': getattr(scholar, 'is_dormer', False),
-            
+            'assigned_office': getattr(moderator, 'office_name', None),
             'service_logs': []
         }
 
@@ -814,3 +806,92 @@ def manage_announcements_view(request):
         return HttpResponseForbidden("You do not have permission to manage announcements.")
     
     return render(request, 'manage_announcements.html')
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def offices_list_create(request):
+    """List or create offices (Admin only for POST)"""
+    if request.method == 'GET':
+        offices = Office.objects.all().values('id', 'name')
+        return Response(list(offices))
+    
+    if request.method == 'POST':
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin access required'}, status=403)
+        
+        name = request.data.get('name', '').strip()
+        if not name:
+            return Response({'error': 'Office name is required'}, status=400)
+        
+        office, created = Office.objects.get_or_create(name=name)
+        if not created:
+            return Response({'error': 'Office already exists'}, status=400)
+        
+        return Response({'id': office.id, 'name': office.name}, status=201)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def office_detail(request, office_id):
+    """Update or delete an office (Admin only)"""
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin access required'}, status=403)
+    
+    try:
+        office = Office.objects.get(id=office_id)
+    except Office.DoesNotExist:
+        return Response({'error': 'Office not found'}, status=404)
+    
+    if request.method == 'PUT':
+        new_name = request.data.get('name', '').strip()
+        if not new_name:
+            return Response({'error': 'Office name is required'}, status=400)
+        
+        if Office.objects.filter(name=new_name).exclude(id=office_id).exists():
+            return Response({'error': 'An office with this name already exists'}, status=400)
+        
+        old_name = office.name
+        office.name = new_name
+        office.save()
+        
+        # Cascade update existing logs and profiles (as requested)
+        ServiceLog.objects.filter(office_name=old_name).update(office_name=new_name)
+        ModeratorProfile.objects.filter(office_name=old_name).update(office_name=new_name)
+        
+        return Response({'id': office.id, 'name': office.name})
+    
+    if request.method == 'DELETE':
+        # Note: We don't delete historical logs, they just keep the old name string
+        office.delete()
+        return Response({'message': 'Office deleted successfully'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def remove_moderator(request):
+    """Demote a moderator back to a scholar (Admin only)"""
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin access required'}, status=403)
+    
+    username = request.data.get('username')
+    if not username:
+        return Response({'error': 'Username is required'}, status=400)
+    
+    try:
+        user = User.objects.get(username=username)
+        if user.role != 'MODERATOR':
+            return Response({'error': 'User is not a moderator'}, status=400)
+        
+        user.role = 'SCHOLAR'
+        user.save()
+        
+        # Delete moderator profile if it exists
+        ModeratorProfile.objects.filter(user=user).delete()
+        
+        return Response({'message': f'User {username} demoted to Scholar successfully'})
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+@login_required(login_url='/login/')
+def add_log_page(request):
+    return render(request, 'add_log.html')
