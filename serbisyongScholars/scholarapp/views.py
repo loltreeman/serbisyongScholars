@@ -617,23 +617,23 @@ def assign_moderator(request):
     try:
         target_user = User.objects.get(username=moderator_username)
 
-        # Prevent duplicate moderator assignment.
-        if target_user.role == 'MODERATOR':
-            return Response({'error': f'User {moderator_username} is already a moderator.'}, status=400)
+        already_moderator = target_user.role == 'MODERATOR'
 
-        target_user.role = 'MODERATOR'
-        target_user.save()
-        
-        #Link them to the office by creating/updating their ModeratorProfile
+        if not already_moderator:
+            target_user.role = 'MODERATOR'
+            target_user.save()
+
         ModeratorProfile.objects.update_or_create(
             user=target_user,
             defaults={'office_name': office_name}
         )
-        return Response({'message': f'Moderator {moderator_username} assigned to {office_name}'})
+
+        action = 'updated office for' if already_moderator else 'assigned'
+        return Response({'message': f'Successfully {action} moderator {moderator_username} → {office_name}'})
     except User.DoesNotExist:
         return Response({'error': 'Moderator user not found'}, status=404)
     except Exception as e:
-            return Response({'error': str(e)}, status=500)
+        return Response({'error': str(e)}, status=500)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
