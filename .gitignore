@@ -116,3 +116,5 @@ node_modules
 # **/migrations/**
 # !**/migrations
 # !**/migrations/__init__.py
+/serbisyongScholars/dummy_data
+
