@@ -161,3 +161,64 @@ class Announcement(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
+class Voucher(models.Model):
+    CATEGORY_CHOICES = [
+        ('FOODSTUB', 'Food Stub'),
+        ('ENTERTAINMENT', 'Entertainment'),
+        ('TRANSPORT', 'Transport'),
+        ('WELLNESS', 'Wellness'),
+        ('ACADEMIC', 'Academic'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('EXPIRED', 'Expired'),
+        ('FULL', 'Full'),
+    ]
+    
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    provider = models.CharField(max_length=100)  # e.g., "EBAIS", "Kitchen City"
+    total_slots = models.IntegerField()
+    remaining_slots = models.IntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    expiry_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_vouchers')
+    image_url = models.URLField(blank=True, null=True)  # Optional voucher image
+    
+    def __str__(self):
+        return f"{self.title} - {self.remaining_slots}/{self.total_slots} slots"
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def is_available(self):
+        """Check if voucher is still available"""
+        from datetime import date
+        return self.remaining_slots > 0 and self.expiry_date >= date.today() and self.status == 'ACTIVE'
+
+
+class VoucherApplication(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+        ('CLAIMED', 'Claimed'),
+    ]
+    
+    voucher = models.ForeignKey(Voucher, on_delete=models.CASCADE, related_name='applications')
+    scholar = models.ForeignKey(User, on_delete=models.CASCADE, related_name='voucher_applications')
+    applied_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    notes = models.TextField(blank=True, null=True)  
+    admin_notes = models.TextField(blank=True, null=True) 
+    
+    class Meta:
+        unique_together = ['voucher', 'scholar'] 
+        ordering = ['-applied_at']
+    
+    def __str__(self):
+        return f"{self.scholar.username} - {self.voucher.title} ({self.status})"

@@ -203,4 +203,81 @@ document
     .getElementById("logout-mobile")
     .addEventListener("click", handleLogout);
 
-load();
+    /**
+ * Load recent vouchers for dashboard widget
+ */
+async function loadVouchersWidget() {
+    const container = document.getElementById('vouchers-widget-container');
+    
+    if (!container) return; // Widget not on this page
+    
+    try {
+        const response = await fetch('/api/vouchers/', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access')}`
+            }
+        });
+        
+        const vouchers = await response.json();
+
+        if (!vouchers || vouchers.length === 0) {
+            container.innerHTML = '<p class="text-slate-400 text-xs text-center py-4">No vouchers available.</p>';
+            return;
+        }
+
+        // Show only first 2 vouchers
+        const recentVouchers = vouchers.slice(0, 2);
+        
+        const categoryColors = {
+            'FOODSTUB': { bg: '#fef3c7', border: '#fde68a', badge: '#f59e0b', text: '#78350f' },
+            'ENTERTAINMENT': { bg: '#e9d5ff', border: '#d8b4fe', badge: '#a855f7', text: '#581c87' },
+            'TRANSPORT': { bg: '#dbeafe', border: '#bfdbfe', badge: '#3b82f6', text: '#1e3a8a' },
+            'WELLNESS': { bg: '#d1fae5', border: '#a7f3d0', badge: '#10b981', text: '#064e3b' },
+            'ACADEMIC': { bg: '#fee2e2', border: '#fecaca', badge: '#ef4444', text: '#7f1d1d' },
+        };
+
+        container.innerHTML = recentVouchers.map(voucher => {
+            const colors = categoryColors[voucher.category] || categoryColors['FOODSTUB'];
+            const percentage = ((voucher.total_slots - voucher.remaining_slots) / voucher.total_slots * 100).toFixed(0);
+            
+            return `
+                <a href="/api/vouchers-page/" 
+                class="block p-4 rounded-xl transition hover:shadow-md"
+                style="background-color: ${colors.bg}; border: 1px solid ${colors.border};">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white text-[10px] font-bold px-2 py-1 rounded uppercase"
+                            style="background-color: ${colors.badge};">
+                            ${voucher.category.replace('FOODSTUB', 'Food Stub')}
+                        </span>
+                        <span class="text-xs font-bold" style="color: ${colors.text};">
+                            ${voucher.remaining_slots} slots left
+                        </span>
+                    </div>
+                    <div class="font-bold text-sm mb-1" style="color: ${colors.text};">
+                        ${voucher.title}
+                    </div>
+                    <p class="text-xs mb-2" style="color: ${colors.text};">
+                        ${voucher.provider}
+                    </p>
+                    <div class="w-full h-2 bg-white bg-opacity-50 rounded-full overflow-hidden">
+                        <div class="h-full transition-all" 
+                            style="width: ${percentage}%; background-color: ${colors.badge};"></div>
+                    </div>
+                </a>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error fetching vouchers:', error);
+        container.innerHTML = '<p class="text-red-400 text-xs">Failed to load vouchers.</p>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    load(); 
+    loadAnnouncements();
+    loadVouchersWidget();  
+});
+
+
+
