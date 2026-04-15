@@ -731,19 +731,23 @@ def announcements_list(request):
         except Announcement.DoesNotExist:
             return Response({'error': 'Announcement not found'}, status=404)
         
-        # MODERATOR can only edit their own PENDING announcements
+        # MODERATOR can only edit their own PENDING or REJECTED announcements
         # ADMIN can edit any announcement
         if request.user.role == 'MODERATOR':
             if announcement.author != request.user:
                 return Response({'error': 'You can only edit your own announcements'}, status=403)
-            if announcement.status != 'PENDING':
-                return Response({'error': 'You can only edit pending announcements'}, status=403)
+            if announcement.status not in ('PENDING', 'REJECTED'):
+                return Response({'error': 'You can only edit pending or rejected announcements'}, status=403)
         elif request.user.role != 'ADMIN':
             return Response({'error': 'Unauthorized'}, status=403)
-        
+
         serializer = AnnouncementSerializer(announcement, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            # Editing a rejected announcement resubmits it for approval
+            if request.user.role == 'MODERATOR' and announcement.status == 'REJECTED':
+                serializer.save(status='PENDING', rejection_reason='')
+            else:
+                serializer.save()
             return Response(serializer.data, status=200)
         return Response(serializer.errors, status=400)
     
