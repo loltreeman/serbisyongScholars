@@ -222,3 +222,25 @@ class VoucherApplication(models.Model):
     
     def __str__(self):
         return f"{self.scholar.username} - {self.voucher.title} ({self.status})"
+
+
+class Penalty(models.Model):
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('RESOLVED', 'Resolved'),
+        ('WAIVED', 'Waived'),
+    ]
+
+    scholar = models.ForeignKey(User, on_delete=models.CASCADE, related_name='penalties')
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_penalties')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.scholar.username} - {self.reason[:50]} ({self.status})"

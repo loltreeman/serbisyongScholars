@@ -20,8 +20,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
-from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication
-from .serializers import VoucherSerializer, VoucherApplicationSerializer
+from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty
+from .serializers import VoucherSerializer, VoucherApplicationSerializer, PenaltySerializer
 from django.http import JsonResponse
 from datetime import date
 from django.db.models import Q
@@ -1141,3 +1141,55 @@ def approve_voucher_application(request, application_id):
 @login_required
 def vouchers_page(request):
     return render(request, 'vouchers.html')
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def penalties_list(request):
+    """GET: Admin lists all penalties; Scholar lists own. POST: Admin creates a penalty."""
+    if request.method == 'GET':
+        if request.user.role == 'ADMIN':
+            penalties = Penalty.objects.all()
+        elif request.user.role == 'SCHOLAR':
+            penalties = Penalty.objects.filter(scholar=request.user)
+        else:
+            return Response({'error': 'Unauthorized'}, status=403)
+        serializer = PenaltySerializer(penalties, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        serializer = PenaltySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(created_by=request.user)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def penalty_detail(request, penalty_id):
+    """GET: view a penalty. PUT: Admin updates status (resolve/waive)."""
+    try:
+        penalty = Penalty.objects.get(id=penalty_id)
+    except Penalty.DoesNotExist:
+        return Response({'error': 'Penalty not found'}, status=404)
+
+    if request.user.role == 'SCHOLAR' and penalty.scholar != request.user:
+        return Response({'error': 'Unauthorized'}, status=403)
+    if request.user.role == 'MODERATOR':
+        return Response({'error': 'Unauthorized'}, status=403)
+
+    if request.method == 'GET':
+        serializer = PenaltySerializer(penalty)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        serializer = PenaltySerializer(penalty, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)

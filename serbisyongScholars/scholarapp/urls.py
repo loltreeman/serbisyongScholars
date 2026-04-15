@@ -32,4 +32,6 @@ urlpatterns = [
     path('vouchers/applications/', views.voucher_applications_list, name='voucher_applications_list'),
     path('vouchers/applications/<int:application_id>/approve/', views.approve_voucher_application, name='approve_voucher_application'),
     path('vouchers-page/', views.vouchers_page, name='vouchers_page'),
+    path('penalties/', views.penalties_list, name='penalties_list'),
+    path('penalties/<int:penalty_id>/', views.penalty_detail, name='penalty_detail'),
 ]

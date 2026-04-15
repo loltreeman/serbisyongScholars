@@ -12,7 +12,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
     search_fields = ('title', 'content')
 
 from django.contrib import admin
-from .models import Voucher, VoucherApplication
+from .models import Voucher, VoucherApplication, Penalty
 
 @admin.register(Voucher)
 class VoucherAdmin(admin.ModelAdmin):
@@ -35,4 +35,13 @@ class VoucherApplicationAdmin(admin.ModelAdmin):
     list_filter = ('status', 'applied_at', 'voucher__category')
     search_fields = ('scholar__username', 'scholar__first_name', 'scholar__last_name', 'voucher__title')
     readonly_fields = ('applied_at',)
+    list_editable = ('status',)
+
+
+@admin.register(Penalty)
+class PenaltyAdmin(admin.ModelAdmin):
+    list_display = ('scholar', 'reason', 'status', 'created_by', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('scholar__username', 'scholar__first_name', 'reason')
+    readonly_fields = ('created_at', 'updated_at')
     list_editable = ('status',)
