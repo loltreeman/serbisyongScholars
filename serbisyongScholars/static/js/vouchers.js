@@ -211,7 +211,7 @@ async function fetchMyApplications() {
 }
 
 function renderMyApplications(applications) {
-    const container = document.getElementById('my-applications-container'); // Ensure this ID exists in your HTML
+    const container = document.getElementById('my-applications-container');
     if (!container) return;
 
     if (applications.length === 0) {
@@ -232,6 +232,9 @@ function renderMyApplications(applications) {
             <div class="border p-4 rounded-lg flex justify-between items-center">
                 <div>
                     <h4 class="font-bold">${app.voucher_title}</h4>
+                    <span class="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 bg-gray-100 rounded text-gray-500">
+                        ${app.voucher_category}
+                    </span>
                     <p class="text-sm text-gray-500">Applied on: ${new Date(app.applied_at).toLocaleDateString()}</p>
                 </div>
                 <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[app.status] || 'bg-gray-100'}">
