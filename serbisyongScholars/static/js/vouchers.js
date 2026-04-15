@@ -185,3 +185,61 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    fetchVouchers('all');
+    fetchMyApplications(); // New call
+});
+
+async function fetchMyApplications() {
+    try {
+        const response = await fetch('/api/vouchers/my-applications/', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch applications');
+        
+        const applications = await response.json();
+        renderMyApplications(applications);
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('my-applications-container').innerHTML = 'Failed to load applications.';
+    }
+}
+
+function renderMyApplications(applications) {
+    const container = document.getElementById('my-applications-container'); // Ensure this ID exists in your HTML
+    if (!container) return;
+
+    if (applications.length === 0) {
+        container.innerHTML = '<p class="text-gray-500">You haven\'t applied for any vouchers yet.</p>';
+        return;
+    }
+
+    let html = '<div class="space-y-4">';
+    applications.forEach(app => {
+        const statusColors = {
+            'PENDING': 'bg-yellow-100 text-yellow-800',
+            'APPROVED': 'bg-green-100 text-green-800',
+            'REJECTED': 'bg-red-100 text-red-800',
+            'CLAIMED': 'bg-blue-100 text-blue-800'
+        };
+
+        html += `
+            <div class="border p-4 rounded-lg flex justify-between items-center">
+                <div>
+                    <h4 class="font-bold">${app.voucher_title}</h4>
+                    <p class="text-sm text-gray-500">Applied on: ${new Date(app.applied_at).toLocaleDateString()}</p>
+                </div>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[app.status] || 'bg-gray-100'}">
+                    ${app.status}
+                </span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
