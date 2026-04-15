@@ -1,10 +1,10 @@
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APITestCase
 from django.test import TestCase, Client  
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
-from datetime import date
-from .models import Announcement, User, ScholarProfile, ServiceLog, ModeratorProfile
+from datetime import date, timedelta
+from .models import Announcement, User, ScholarProfile, ServiceLog, ModeratorProfile, Voucher, VoucherApplication
 
 User = get_user_model()
 
@@ -508,3 +508,78 @@ class AnnouncementCategoryTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.json()['error'], 'Admin only')
+
+class VoucherSystemTests(APITestCase):
+    def setUp(self):
+        # Create Users
+        self.admin_user = User.objects.create_user(username='admin', password='password', role='ADMIN')
+        self.scholar_user = User.objects.create_user(username='scholar', password='password', role='SCHOLAR')
+        
+        # Create a test voucher
+        self.voucher = Voucher.objects.create(
+            title="Free Lunch Stub",
+            description="Good for 1 free meal.",
+            category="FOODSTUB",
+            provider="Kitchen City",
+            total_slots=2,
+            remaining_slots=2,
+            expiry_date=date.today() + timedelta(days=30),
+            created_by=self.admin_user
+        )
+
+    def test_scholar_can_list_active_vouchers(self):
+        self.client.force_authenticate(user=self.scholar_user)
+        response = self.client.get('/api/vouchers/')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], "Free Lunch Stub")
+
+    def test_scholar_can_apply_for_voucher(self):
+        self.client.force_authenticate(user=self.scholar_user)
+        response = self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Check if slot decremented
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.remaining_slots, 1)
+        
+        # Check application status
+        app = VoucherApplication.objects.get(scholar=self.scholar_user, voucher=self.voucher)
+        self.assertEqual(app.status, 'PENDING')
+
+    def test_scholar_cannot_apply_twice(self):
+        self.client.force_authenticate(user=self.scholar_user)
+        # Apply once
+        self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+        # Try applying again
+        response = self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already applied', response.data['error'])
+
+    def test_admin_rejecting_restores_slot(self):
+        # First, scholar applies
+        self.client.force_authenticate(user=self.scholar_user)
+        self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+        
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.remaining_slots, 1)
+        
+        # Now, Admin rejects
+        self.client.force_authenticate(user=self.admin_user)
+        app = VoucherApplication.objects.first()
+        response = self.client.post(f'/api/vouchers/applications/{app.id}/approve/', {
+            'action': 'reject',
+            'admin_notes': 'Ineligible'
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Check if slot restored
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.remaining_slots, 2)
+        
+        app.refresh_from_db()
+        self.assertEqual(app.status, 'REJECTED')

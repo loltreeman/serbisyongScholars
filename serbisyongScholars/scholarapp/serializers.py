@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
-from .models import User, ScholarProfile, ServiceLog, Announcement
+from .models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication
 from datetime import date
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -163,3 +163,30 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'author_name', 'author_username', 'created_at', 'updated_at', 'external_link', 'rejection_reason'
         ]
         read_only_fields = ['author', 'created_at', 'updated_at', 'status']
+
+class VoucherSerializer(serializers.ModelSerializer):
+    is_available = serializers.BooleanField(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Voucher
+        fields = [
+            'id', 'title', 'description', 'category', 'provider',
+            'total_slots', 'remaining_slots', 'status', 'expiry_date',
+            'created_at', 'created_by_name', 'image_url', 'is_available'
+        ]
+        read_only_fields = ['remaining_slots', 'created_by']
+
+
+class VoucherApplicationSerializer(serializers.ModelSerializer):
+    voucher_title = serializers.CharField(source='voucher.title', read_only=True)
+    scholar_name = serializers.CharField(source='scholar.get_full_name', read_only=True)
+    scholar_id = serializers.CharField(source='scholar.scholarprofile.student_id', read_only=True)
+    
+    class Meta:
+        model = VoucherApplication
+        fields = [
+            'id', 'voucher', 'voucher_title', 'scholar', 'scholar_name', 
+            'scholar_id', 'applied_at', 'status', 'notes', 'admin_notes'
+        ]
+        read_only_fields = ['scholar', 'applied_at', 'status']

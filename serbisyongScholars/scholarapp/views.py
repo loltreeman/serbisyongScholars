@@ -20,8 +20,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
-from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office
+from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication
+from .serializers import VoucherSerializer, VoucherApplicationSerializer
 from django.http import JsonResponse
+from datetime import date
+from django.db.models import Q
 
 
 User = get_user_model()
@@ -918,6 +921,219 @@ def remove_moderator(request):
         return Response({'message': f'User {username} demoted to Scholar successfully'})
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=404)
+    
 @login_required(login_url='/login/')
 def add_log_page(request):
     return render(request, 'add_log.html')
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def vouchers_list(request):
+    """
+    GET: List all active vouchers
+    POST: Create voucher (ADMIN only)
+    """
+    if request.method == 'GET':
+        # Scholars see only active, available vouchers
+        # Admins see all vouchers
+        if request.user.role == 'ADMIN':
+            vouchers = Voucher.objects.all()
+        else:
+            vouchers = Voucher.objects.filter(
+                status='ACTIVE',
+                expiry_date__gte=date.today(),
+                remaining_slots__gt=0
+            )
+        
+        # Filter by category if provided
+        category = request.GET.get('category')
+        if category:
+            vouchers = vouchers.filter(category=category)
+        
+        serializer = VoucherSerializer(vouchers, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        # Only ADMIN can create vouchers
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        
+        serializer = VoucherSerializer(data=request.data)
+        if serializer.is_valid():
+            # Set remaining_slots = total_slots initially
+            total_slots = serializer.validated_data.get('total_slots')
+            serializer.save(
+                created_by=request.user,
+                remaining_slots=total_slots
+            )
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def voucher_detail(request, voucher_id):
+    """
+    GET: Get voucher details
+    PUT: Update voucher (ADMIN only)
+    DELETE: Delete voucher (ADMIN only)
+    """
+    try:
+        voucher = Voucher.objects.get(id=voucher_id)
+    except Voucher.DoesNotExist:
+        return Response({'error': 'Voucher not found'}, status=404)
+    
+    if request.method == 'GET':
+        serializer = VoucherSerializer(voucher)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        
+        serializer = VoucherSerializer(voucher, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+    
+    elif request.method == 'DELETE':
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        
+        voucher.delete()
+        return Response({'message': 'Voucher deleted successfully'}, status=200)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def apply_voucher(request, voucher_id):
+    """
+    Scholar applies for a voucher
+    """
+    if request.user.role != 'SCHOLAR':
+        return Response({'error': 'Only scholars can apply for vouchers'}, status=403)
+    
+    try:
+        voucher = Voucher.objects.get(id=voucher_id)
+    except Voucher.DoesNotExist:
+        return Response({'error': 'Voucher not found'}, status=404)
+    
+    # Check if voucher is available
+    if not voucher.is_available():
+        return Response({'error': 'Voucher is no longer available'}, status=400)
+    
+    # Check if scholar already applied
+    existing_application = VoucherApplication.objects.filter(
+        voucher=voucher,
+        scholar=request.user
+    ).first()
+    
+    if existing_application:
+        return Response({
+            'error': 'You have already applied for this voucher',
+            'status': existing_application.status
+        }, status=400)
+    
+    # Create application
+    notes = request.data.get('notes', '')
+    
+    application = VoucherApplication.objects.create(
+        voucher=voucher,
+        scholar=request.user,
+        notes=notes,
+        status='PENDING'
+    )
+    
+    # Decrement remaining slots
+    voucher.remaining_slots -= 1
+    if voucher.remaining_slots == 0:
+        voucher.status = 'FULL'
+    voucher.save()
+    
+    serializer = VoucherApplicationSerializer(application)
+    return Response(serializer.data, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_voucher_applications(request):
+    """
+    Get current scholar's voucher applications
+    """
+    if request.user.role != 'SCHOLAR':
+        return Response({'error': 'Scholars only'}, status=403)
+    
+    applications = VoucherApplication.objects.filter(scholar=request.user)
+    serializer = VoucherApplicationSerializer(applications, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def voucher_applications_list(request):
+    """
+    Admin view: Get all voucher applications
+    """
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin only'}, status=403)
+    
+    applications = VoucherApplication.objects.all()
+    
+    # Filter by status
+    status = request.GET.get('status')
+    if status:
+        applications = applications.filter(status=status)
+    
+    # Filter by voucher
+    voucher_id = request.GET.get('voucher_id')
+    if voucher_id:
+        applications = applications.filter(voucher_id=voucher_id)
+    
+    serializer = VoucherApplicationSerializer(applications, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def approve_voucher_application(request, application_id):
+    """
+    Admin approves or rejects a voucher application
+    """
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin only'}, status=403)
+    
+    try:
+        application = VoucherApplication.objects.get(id=application_id)
+    except VoucherApplication.DoesNotExist:
+        return Response({'error': 'Application not found'}, status=404)
+    
+    action = request.data.get('action')  # 'approve' or 'reject'
+    admin_notes = request.data.get('admin_notes', '')
+    
+    if action == 'approve':
+        application.status = 'APPROVED'
+        application.admin_notes = admin_notes
+        application.save()
+        return Response({'message': 'Application approved'}, status=200)
+    
+    elif action == 'reject':
+        application.status = 'REJECTED'
+        application.admin_notes = admin_notes
+        application.save()
+        
+        # Return slot to voucher
+        voucher = application.voucher
+        voucher.remaining_slots += 1
+        if voucher.status == 'FULL':
+            voucher.status = 'ACTIVE'
+        voucher.save()
+        
+        return Response({'message': 'Application rejected'}, status=200)
+    
+    else:
+        return Response({'error': 'Invalid action'}, status=400)
+    
+@login_required
+def vouchers_page(request):
+    return render(request, 'vouchers.html')

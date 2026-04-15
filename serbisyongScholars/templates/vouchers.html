@@ -1,0 +1,123 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vouchers - serbisyongScholar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    
+    {% include 'partials/navbar.html' %}
+    
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Available Vouchers & Rewards</h1>
+                <p class="text-gray-600 mt-2">Sign up for food stubs, tickets, and other rewards</p>
+            </div>
+            
+            {% if request.user.role == 'ADMIN' %}
+            <button onclick="openCreateModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-150">
+                + Create Voucher
+            </button>
+            {% endif %}
+        </div>
+
+        {% if request.user.role == 'ADMIN' %}
+        <div id="create-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Create New Voucher</h2>
+                    <button onclick="closeCreateModal()" class="text-gray-500 hover:text-gray-700 font-bold text-xl">&times;</button>
+                </div>
+                
+                <form id="create-voucher-form" onsubmit="submitNewVoucher(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">Title</label>
+                        <input type="text" id="v-title" required class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea id="v-desc" required class="mt-1 w-full border border-gray-300 rounded-md p-2"></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Category</label>
+                            <select id="v-category" required class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                                <option value="FOODSTUB">Food Stub</option>
+                                <option value="ENTERTAINMENT">Entertainment</option>
+                                <option value="TRANSPORT">Transport</option>
+                                <option value="WELLNESS">Wellness</option>
+                                <option value="ACADEMIC">Academic</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Total Slots</label>
+                            <input type="number" id="v-slots" min="1" required class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Provider</label>
+                            <input type="text" id="v-provider" required placeholder="e.g., Kitchen City" class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Expiry Date</label>
+                            <input type="date" id="v-expiry" required class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700">Image URL (Optional)</label>
+                        <input type="url" id="v-image" class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg">
+                        Save Voucher
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="bg-white rounded-lg shadow mb-6 p-4">
+            <div class="flex gap-2 overflow-x-auto">
+                <button onclick="filterByCategory('all')" 
+                        class="category-filter-btn active px-4 py-2 rounded-lg bg-blue-600 text-white font-medium">
+                    All
+                </button>
+                <button onclick="filterByCategory('FOODSTUB')" 
+                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                    Food Stubs
+                </button>
+                <button onclick="filterByCategory('ENTERTAINMENT')" 
+                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                    Entertainment
+                </button>
+                <button onclick="filterByCategory('TRANSPORT')" 
+                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                    Transport
+                </button>
+                <button onclick="filterByCategory('WELLNESS')" 
+                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                    Wellness
+                </button>
+                <button onclick="filterByCategory('ACADEMIC')" 
+                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                    Academic
+                </button>
+            </div>
+        </div>
+        
+        <div id="vouchers-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+        
+    </div> <script src="{% static 'js/vouchers.js' %}"></script>
+</body>
+</html>
