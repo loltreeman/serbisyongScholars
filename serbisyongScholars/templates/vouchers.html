@@ -115,6 +115,17 @@
             </div>
         </div>
         
+        {% if request.user.role == 'SCHOLAR' %}
+        <div id="my-applications-section" class="bg-white rounded-lg shadow mb-6 p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">My Applications</h2>
+            <div id="my-applications-container" class="text-gray-500 text-sm">
+                <!-- JS: fetch /api/vouchers/my-applications/ and render application cards here -->
+                <!-- Each application should show: voucher_title, voucher_category, voucher_expiry_date, status badge -->
+                Loading your applications...
+            </div>
+        </div>
+        {% endif %}
+
         <div id="vouchers-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             </div>
         
