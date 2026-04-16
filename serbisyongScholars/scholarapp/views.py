@@ -191,7 +191,9 @@ def reconcile_expired_voucher_state():
     """Expire vouchers and auto-decline pending applications for expired vouchers."""
     today = date.today()
 
-    Voucher.objects.filter(expiry_date__lt=today).exclude(status='EXPIRED').update(status='EXPIRED')
+    Voucher.objects.filter(expiry_date__lt=today)\
+        .exclude(status__in=['EXPIRED', 'PENDING', 'REJECTED'])\
+        .update(status='EXPIRED')
 
     pending_apps = VoucherApplication.objects.select_related('voucher').filter(
         status='PENDING',
@@ -1018,15 +1020,24 @@ def vouchers_list(request):
     reconcile_expired_voucher_state()
 
     if request.method == 'GET':
-        # Scholars see only active, available vouchers
-        # Admins see all vouchers
-        if request.user.role == 'ADMIN':
-            vouchers = Voucher.objects.all()
-        else:
+        user = request.user
+        role = get_effective_role(user)
+
+        # Scholars see only active/full/expired but NOT pending or rejected
+        # Scholars see only active vouchers that haven't expired and have slots
+        if role == 'SCHOLAR':
             vouchers = Voucher.objects.filter(
-                status='ACTIVE',
+                status='ACTIVE', 
                 expiry_date__gte=date.today(),
                 remaining_slots__gt=0
+            )
+        # Admins see all
+        elif role == 'ADMIN':
+            vouchers = Voucher.objects.all()
+        # Moderators see active vouchers + their own pending/rejected ones
+        else:
+            vouchers = Voucher.objects.filter(
+                Q(status__in=['ACTIVE', 'FULL', 'EXPIRED']) | Q(created_by=user)
             )
         
         # Filter by category if provided
@@ -1034,7 +1045,12 @@ def vouchers_list(request):
         if category:
             vouchers = vouchers.filter(category=category)
         
-        serializer = VoucherSerializer(vouchers, many=True)
+        # Filter by status if provided (for history/admin views)
+        status_filter = request.GET.get('status')
+        if status_filter:
+            vouchers = vouchers.filter(status=status_filter)
+        
+        serializer = VoucherSerializer(vouchers.distinct(), many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
@@ -1044,11 +1060,15 @@ def vouchers_list(request):
         
         serializer = VoucherSerializer(data=request.data)
         if serializer.is_valid():
-            # Set remaining_slots = total_slots initially
             total_slots = serializer.validated_data.get('total_slots')
+            
+            # Admins create active vouchers; Moderators create pending ones
+            initial_status = 'ACTIVE' if request.user.role == 'ADMIN' else 'PENDING'
+            
             serializer.save(
                 created_by=request.user,
-                remaining_slots=total_slots
+                remaining_slots=total_slots,
+                status=initial_status
             )
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
@@ -1158,6 +1178,36 @@ def voucher_detail(request, voucher_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def voucher_approve(request, voucher_id):
+    """
+    Approve or reject a moderator-submitted voucher (ADMIN only)
+    """
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Only admins can approve/reject vouchers'}, status=403)
+    
+    try:
+        voucher = Voucher.objects.get(id=voucher_id)
+    except Voucher.DoesNotExist:
+        return Response({'error': 'Voucher not found'}, status=404)
+    
+    action = request.data.get('action') # 'approve' or 'reject'
+    reason = request.data.get('rejection_reason', '')
+
+    if action == 'approve':
+        voucher.status = 'ACTIVE'
+        voucher.rejection_reason = None
+    elif action == 'reject':
+        voucher.status = 'REJECTED'
+        voucher.rejection_reason = reason
+    else:
+        return Response({'error': 'Invalid action'}, status=400)
+    
+    voucher.save()
+    return Response({'message': f'Voucher {action}d successfully'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def apply_voucher(request, voucher_id):
     """
     Scholar applies for a voucher
@@ -1198,10 +1248,8 @@ def apply_voucher(request, voucher_id):
         status='PENDING'
     )
     
-    # Decrement remaining slots
-    voucher.remaining_slots -= 1
-    if voucher.remaining_slots == 0:
-        voucher.status = 'FULL'
+    # Slot decrement is now handled on APPROVAL, not on application
+    # to avoid slot leakage from rejected/pending applications.
     voucher.save()
     
     serializer = VoucherApplicationSerializer(application)
@@ -1292,22 +1340,35 @@ def approve_voucher_application(request, application_id):
     admin_notes = request.data.get('admin_notes', '')
     
     if action == 'approve':
+        # Check if slots are still available at approval time
+        if application.voucher.remaining_slots <= 0:
+            return Response({'error': 'No more slots available for this voucher'}, status=400)
+            
         application.status = 'APPROVED'
         application.admin_notes = admin_notes
         application.save()
+        
+        # Decrement slot on APPROVAL
+        voucher = application.voucher
+        voucher.remaining_slots -= 1
+        if voucher.remaining_slots <= 0:
+            voucher.status = 'FULL'
+        voucher.save()
+        
         return Response({'message': 'Application approved'}, status=200)
     
     elif action == 'reject':
+        # If it was previously approved, return the slot
+        if application.status == 'APPROVED':
+            voucher = application.voucher
+            voucher.remaining_slots += 1
+            if voucher.status == 'FULL':
+                voucher.status = 'ACTIVE'
+            voucher.save()
+        
         application.status = 'REJECTED'
         application.admin_notes = admin_notes
         application.save()
-        
-        # Return slot to voucher
-        voucher = application.voucher
-        voucher.remaining_slots += 1
-        if voucher.status == 'FULL':
-            voucher.status = 'ACTIVE'
-        voucher.save()
         
         return Response({'message': 'Application rejected'}, status=200)
     

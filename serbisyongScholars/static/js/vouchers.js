@@ -8,18 +8,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (CAN_MANAGE_APPLICATIONS) {
         loadApplicationsForMod();
         loadHistorySection();
+        loadVoucherSubmissions(); // New: For tracking voucher proposals
     }
 });
 
 let allVouchers = [];
 let allHistoryData = [];
+let allVoucherSubs = []; // New: For voucher proposal history
 
 async function fetchVouchers(category = 'all') {
     try {
         let url = '/api/vouchers/';
-        if (category !== 'all') {
-            url += `?category=${category}`;
-        }
+        const params = new URLSearchParams();
+        if (category !== 'all') params.append('category', category);
+        
+        // For the main display, we usually want ACTIVE vouchers
+        // But the backend now handles the filtering based on role
+        if (params.toString()) url += `?${params.toString()}`;
 
         const response = await fetch(url, {
             headers: {
@@ -31,7 +36,10 @@ async function fetchVouchers(category = 'all') {
         if (!response.ok) throw new Error('Failed to fetch vouchers');
 
         allVouchers = await response.json();
-        renderVouchers(allVouchers);
+        // The main view should only show ACTIVE (and FULL/EXPIRED) unless it's a history view
+        // But for consistency with the UI, let's filter the main cards to NOT show REJECTED or PENDING
+        // unless you are the creator or admin.
+        renderVouchers(allVouchers.filter(v => v.status !== 'REJECTED' && v.status !== 'PENDING'));
     } catch (error) {
         console.error('Error:', error);
         document.getElementById('vouchers-container').innerHTML = `
@@ -116,13 +124,16 @@ function renderVouchers(vouchers) {
     });
 }
 
-function filterByCategory(category) {
+function filterByCategory(category, event) {
     document.querySelectorAll('.category-filter-btn').forEach(btn => {
         btn.classList.remove('bg-blue-600', 'text-white');
         btn.classList.add('bg-gray-200', 'text-gray-800');
     });
-    event.currentTarget.classList.remove('bg-gray-200', 'text-gray-800');
-    event.currentTarget.classList.add('bg-blue-600', 'text-white');
+    const target = event ? event.currentTarget : null;
+    if (target) {
+        target.classList.remove('bg-gray-200', 'text-gray-800');
+        target.classList.add('bg-blue-600', 'text-white');
+    }
 
     fetchVouchers(category);
 }
@@ -433,16 +444,20 @@ async function loadHistorySection() {
 }
 
 function applyHistoryFilters() {
-    const search = document.getElementById('hist-search').value.toLowerCase();
-    const status = document.getElementById('hist-status').value;
-    const dateLimit = document.getElementById('hist-date').value;
+    const searchEl = document.getElementById('hist-search');
+    const search = searchEl ? searchEl.value.toLowerCase() : '';
+    const statusEl = document.getElementById('hist-status');
+    const status = statusEl ? statusEl.value : 'all';
+    const dateEl = document.getElementById('hist-date');
+    const dateLimit = dateEl ? dateEl.value : '';
 
     const filtered = allHistoryData.filter(app => {
-        const matchesSearch = app.voucher_title.toLowerCase().includes(search) || 
+        const matchesSearch = !search || 
+                             app.voucher_title.toLowerCase().includes(search) || 
                              app.scholar_name.toLowerCase().includes(search) || 
                              app.scholar_id.includes(search);
         const matchesStatus = status === 'all' || app.status === status;
-        const matchesDate = !dateLimit || app.applied_at.startsWith(dateLimit);
+        const matchesDate = !dateLimit || (app.applied_at && app.applied_at.startsWith(dateLimit));
         return matchesSearch && matchesStatus && matchesDate;
     });
 
@@ -452,7 +467,7 @@ function applyHistoryFilters() {
 function renderHistoryTable(data) {
     const tbody = document.getElementById('history-table-body');
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No matching records found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No matching records found.</td></tr>';
         return;
     }
 
@@ -462,12 +477,9 @@ function renderHistoryTable(data) {
                 <div class="font-bold text-gray-900">${app.voucher_title}</div>
                 <div class="text-[10px] text-gray-500 uppercase font-medium">${app.voucher_category}</div>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-xs text-gray-600">
-                ${app.voucher_created_by_name || 'System'}
-            </td>
-            <td class="px-4 py-3 whitespace-nowrap">
-                <div class="font-medium text-gray-900">${app.scholar_name}</div>
-                <div class="text-[10px] text-gray-500">${app.scholar_id}</div>
+            <td class="px-4 py-3 whitespace-nowrap text-xs text-blue-600 font-bold">
+                ${app.scholar_name}
+                <div class="text-[10px] text-gray-400 font-normal">${app.scholar_id}</div>
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold ${app.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
@@ -482,6 +494,136 @@ function renderHistoryTable(data) {
             </td>
         </tr>
     `).join('');
+}
+
+// ==========================================
+// VOUCHER SUBMISSIONS (PROPOSALS) HANDLING
+// ==========================================
+
+async function loadVoucherSubmissions() {
+    if (!CAN_MANAGE_APPLICATIONS) return;
+    
+    try {
+        const statusFilter = document.getElementById('v-sub-status').value;
+        
+        // Always fetch ALL vouchers — we'll filter client-side for the proposals view
+        const response = await fetch(`/api/vouchers/`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access')}`
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to load submissions');
+        
+        const allVoucherData = await response.json();
+        allVoucherSubs = allVoucherData;
+        
+        // Proposals table: admins see all, mods see only their own
+        let filtered = IS_ADMIN ? allVoucherSubs : allVoucherSubs.filter(v => v.created_by_username === CURRENT_USERNAME);
+        
+        // Apply status filter from the dropdown
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(v => v.status === statusFilter);
+        }
+        
+        renderVoucherSubmissions(filtered);
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function renderVoucherSubmissions(subs) {
+    const tableBody = document.getElementById('voucher-sub-table-body');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '';
+    
+    if (subs.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                    No matching voucher proposals found.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    subs.forEach(v => {
+        let statusBadge = v.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                         v.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+                         v.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800';
+                         
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-3">
+                <div class="font-bold text-gray-900">${v.title}</div>
+                <div class="text-[10px] text-gray-500">${v.category} | ${v.provider}</div>
+            </td>
+            <td class="px-4 py-3 text-gray-600 text-xs">${v.created_by_name}</td>
+            <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${statusBadge}">${v.status_display}</span>
+                ${v.rejection_reason ? `<div class="text-[10px] text-red-500 mt-1 italic">"${v.rejection_reason}"</div>` : ''}
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs">${new Date(v.created_at).toLocaleDateString()}</td>
+            <td class="px-4 py-3">
+                ${IS_ADMIN && v.status === 'PENDING' 
+                    ? `<div class="flex gap-2">
+                        <button onclick="handleVoucherApproval(${v.id}, 'approve')" class="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-green-700">APPROVE</button>
+                        <button onclick="handleVoucherApproval(${v.id}, 'reject')" class="bg-white border border-red-200 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-50">REJECT</button>
+                      </div>`
+                    : '<span class="text-gray-400 text-xs">No pending actions</span>'}
+            </td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+function applyVoucherSubFilters() {
+    const q = document.getElementById('v-sub-search').value.toLowerCase();
+    const statusFilter = document.getElementById('v-sub-status').value;
+
+    // Start with ownership filter (mods only see their own)
+    let base = IS_ADMIN ? allVoucherSubs : allVoucherSubs.filter(v => v.created_by_username === CURRENT_USERNAME);
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+        base = base.filter(v => v.status === statusFilter);
+    }
+
+    // Apply search filter
+    const filtered = base.filter(v =>
+        v.title.toLowerCase().includes(q) || v.provider.toLowerCase().includes(q)
+    );
+    renderVoucherSubmissions(filtered);
+}
+
+async function handleVoucherApproval(voucherId, action) {
+    let rejection_reason = '';
+    if (action === 'reject') {
+        rejection_reason = prompt('Enter rejection reason (optional):') || '';
+        if (rejection_reason === null) return;
+    }
+
+    try {
+        const response = await fetch(`/api/vouchers/${voucherId}/approve/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ action, rejection_reason })
+        });
+
+        if (!response.ok) throw new Error('Action failed');
+        
+        showSuccessToast(`Voucher proposal ${action}d`);
+        loadVoucherSubmissions();
+        fetchVouchers('all'); // Refresh main cards
+    } catch (error) {
+        alert(error.message);
+    }
 }
 
 // Utility

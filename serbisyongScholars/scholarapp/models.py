@@ -191,7 +191,9 @@ class Voucher(models.Model):
     ]
     
     STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
         ('ACTIVE', 'Active'),
+        ('REJECTED', 'Rejected'),
         ('EXPIRED', 'Expired'),
         ('FULL', 'Full'),
     ]
@@ -202,11 +204,12 @@ class Voucher(models.Model):
     provider = models.CharField(max_length=100)  # e.g., "EBAIS", "Kitchen City"
     total_slots = models.IntegerField()
     remaining_slots = models.IntegerField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     expiry_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_vouchers')
     image_url = models.URLField(blank=True, null=True)  # Optional voucher image
+    rejection_reason = models.TextField(blank=True, null=True)
     
     def __str__(self):
         return f"{self.title} - {self.remaining_slots}/{self.total_slots} slots"

@@ -166,7 +166,22 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 class VoucherSerializer(serializers.ModelSerializer):
     is_available = serializers.BooleanField(read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+
+    def get_created_by_name(self, obj):
+        user = obj.created_by
+        if not user:
+            return "System"
+        name = user.get_full_name() or user.username
+        if user.role == 'ADMIN':
+            return f"Admin {name} - OAA"
+        elif user.role == 'MODERATOR':
+            office = getattr(user, 'assigned_office', None) or "Moderator"
+            return f"{name} - {office}"
+        return name
 
     def validate_expiry_date(self, value):
         if value < date.today():
@@ -177,20 +192,32 @@ class VoucherSerializer(serializers.ModelSerializer):
         model = Voucher
         fields = [
             'id', 'title', 'description', 'category', 'provider',
-            'total_slots', 'remaining_slots', 'status', 'expiry_date',
-            'created_at', 'created_by_name', 'image_url', 'is_available'
+            'total_slots', 'remaining_slots', 'status', 'status_display', 'rejection_reason', 'expiry_date',
+            'created_at', 'created_by_name', 'created_by_username', 'image_url', 'is_available'
         ]
-        read_only_fields = ['remaining_slots', 'created_by']
+        read_only_fields = ['remaining_slots', 'created_by', 'status', 'rejection_reason']
 
 
 class VoucherApplicationSerializer(serializers.ModelSerializer):
     voucher_title = serializers.CharField(source='voucher.title', read_only=True)
     voucher_category = serializers.CharField(source='voucher.category', read_only=True)
     voucher_expiry_date = serializers.DateField(source='voucher.expiry_date', read_only=True)
-    voucher_created_by_name = serializers.CharField(source='voucher.created_by.get_full_name', read_only=True)
+    voucher_created_by_name = serializers.SerializerMethodField()
     voucher_created_by_username = serializers.CharField(source='voucher.created_by.username', read_only=True)
     scholar_name = serializers.CharField(source='scholar.get_full_name', read_only=True)
     scholar_id = serializers.CharField(source='scholar.scholar_profile.student_id', read_only=True)
+
+    def get_voucher_created_by_name(self, obj):
+        user = obj.voucher.created_by
+        if not user:
+            return "System"
+        name = user.get_full_name() or user.username
+        if user.role == 'ADMIN':
+            return f"Admin {name} - OAA"
+        elif user.role == 'MODERATOR':
+            office = getattr(user, 'assigned_office', None) or "Moderator"
+            return f"{name} - {office}"
+        return name
 
     class Meta:
         model = VoucherApplication
