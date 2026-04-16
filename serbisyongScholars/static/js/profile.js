@@ -153,7 +153,7 @@ function renderProfile(data) {
             <div class="bg-[#0f172a] p-6 text-white flex justify-between items-center">
                 <div>
                     <h2 class="text-xl font-bold">${data.name}</h2>
-                    ${isEditMode && canEditAllFields ? `
+                    ${isEditMode && canEdit ? `
                         <div class="mt-2">
                             <label class="block text-[10px] font-bold text-slate-400 uppercase">Edit Username</label>
                             <input type="text" id="edit-username" value="${data.username || ''}"

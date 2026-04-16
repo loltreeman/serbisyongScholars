@@ -639,6 +639,14 @@ def user_profile(request):
         user.email = payload.get('email')
         user_updated = True
 
+    # Username change (Now allowed by self OR admin)
+    new_username = payload.get('new_username', '').strip()
+    if new_username and new_username != user.username:
+        if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
+            return Response({'error': 'That username is already taken.'}, status=400)
+        user.username = new_username
+        user_updated = True
+
     # --- Admin-only fields ---
     if is_admin:
         if 'role' in payload:
@@ -649,14 +657,6 @@ def user_profile(request):
         if 'grant_type' in payload and scholar:
             scholar.scholar_grant = payload.get('grant_type')
             scholar_updated = True
-            
-        # Username change (Now strictly Admin-only)
-        new_username = payload.get('new_username', '').strip()
-        if new_username and new_username != user.username:
-            if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
-                return Response({'error': 'That username is already taken.'}, status=400)
-            user.username = new_username
-            user_updated = True
 
     # --- Scholar fields: editable by self (if scholar) OR admin ---
     if scholar:
