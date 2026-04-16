@@ -183,7 +183,7 @@ class VoucherApplicationSerializer(serializers.ModelSerializer):
     voucher_category = serializers.CharField(source='voucher.category', read_only=True)
     voucher_expiry_date = serializers.DateField(source='voucher.expiry_date', read_only=True)
     scholar_name = serializers.CharField(source='scholar.get_full_name', read_only=True)
-    scholar_id = serializers.CharField(source='scholar.scholarprofile.student_id', read_only=True)
+    scholar_id = serializers.CharField(source='scholar.scholar_profile.student_id', read_only=True)
 
     class Meta:
         model = VoucherApplication

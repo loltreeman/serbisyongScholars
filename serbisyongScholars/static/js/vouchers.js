@@ -33,6 +33,16 @@ async function fetchVouchers(category = 'all') {
     }
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    fetchVouchers('all');
+    fetchMyApplications(); // For scholars
+    
+    // Admin check
+    if (localStorage.getItem('userRole') === 'ADMIN') {
+        loadAdminApplications();
+    }
+});
+
 function renderVouchers(vouchers) {
     const container = document.getElementById('vouchers-container');
     container.innerHTML = '';
@@ -184,4 +194,179 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    fetchVouchers('all');
+    fetchMyApplications(); // New call
+});
+
+async function fetchMyApplications() {
+    try {
+        const response = await fetch('/api/vouchers/my-applications/', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch applications');
+        
+        const applications = await response.json();
+        renderMyApplications(applications);
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('my-applications-container').innerHTML = 'Failed to load applications.';
+    }
+}
+
+function renderMyApplications(applications) {
+    const container = document.getElementById('my-applications-container');
+    if (!container) return;
+
+    if (applications.length === 0) {
+        container.innerHTML = '<p class="text-gray-500">You haven\'t applied for any vouchers yet.</p>';
+        return;
+    }
+
+    let html = '<div class="space-y-4">';
+    applications.forEach(app => {
+        const statusColors = {
+            'PENDING': 'bg-yellow-100 text-yellow-800',
+            'APPROVED': 'bg-green-100 text-green-800',
+            'REJECTED': 'bg-red-100 text-red-800',
+            'CLAIMED': 'bg-blue-100 text-blue-800'
+        };
+
+        html += `
+            <div class="border p-4 rounded-lg flex justify-between items-center">
+                <div>
+                    <h4 class="font-bold">${app.voucher_title}</h4>
+                    <span class="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 bg-gray-100 rounded text-gray-500">
+                        ${app.voucher_category}
+                    </span>
+                    <p class="text-sm text-gray-500">Applied on: ${new Date(app.applied_at).toLocaleDateString()}</p>
+                </div>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[app.status] || 'bg-gray-100'}">
+                    ${app.status}
+                </span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function loadAdminApplications() {
+    const container = document.getElementById('admin-applications-container');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/vouchers/applications/', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) throw new Error('Failed to fetch applications');
+        
+        const apps = await response.json();
+        // Show only the voucher applications that need approvals
+        const pending = apps.filter(app => app.status === 'PENDING');
+        
+        renderAdminApplications(pending);
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function renderAdminApplications(apps) {
+    const container = document.getElementById('admin-applications-container');
+    
+    if (apps.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">No pending applications to review.</p>';
+        return;
+    }
+
+    container.innerHTML = apps.map(app => `
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-3 flex justify-between items-center shadow-sm">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <h4 class="font-bold text-gray-900">${app.voucher_title}</h4>
+                    <span class="text-xs font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded uppercase">
+                        ${app.voucher_category}
+                    </span>    
+                </div>
+                <p class="text-sm font-medium text-gray-700">Student: ${app.scholar_name} (${app.scholar_id})</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <button onclick="handleApplicationAction(${app.id}, 'approve')" 
+                        class="px-4 py-1.5 bg-green-600 text-white text-xs font-bold rounded hover:bg-green-700 transition">
+                    APPROVE
+                </button>
+                <button onclick="handleApplicationAction(${app.id}, 'reject')" 
+                        class="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition">
+                    REJECT
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function handleApplicationAction(applicationId, action) {
+    let notes = '';
+    
+    if (action === 'approve') {
+        if (!confirm('Approve this voucher application?')) return;
+        notes = 'Approved by Admin';
+    } else {
+        notes = prompt('Reason for rejection (optional):');
+        if (notes === null) return; // User cancelled prompt
+    }
+
+    try {
+        const response = await fetch(`/api/vouchers/applications/${applicationId}/approve/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ 
+                action: action, 
+                admin_notes: notes || 'No additional notes'
+            })
+        });
+
+        if (response.ok) {
+            showSuccessToast(`Application ${action}d successfully`);
+            
+            loadAdminApplications();
+            fetchVouchers('all');
+        } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to update application');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred during the update.');
+    }
+}
+
+function showSuccessToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-[100] transition-opacity duration-300 flex items-center gap-2';
+    toast.innerHTML = `
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="font-medium">${message}</span>
+    `;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 300);
 }
