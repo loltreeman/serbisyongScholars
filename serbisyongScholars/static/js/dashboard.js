@@ -166,7 +166,7 @@ async function loadAnnouncements() {
     const style = announcementCategoryStyles[item.category] || announcementCategoryStyles['GENERAL'];
     
     return `
-        <a href="/api/announcements/${item.id}/" 
+        <a href="/announcements/${item.id}/"
            class="block p-4 rounded-xl transition hover:shadow-md"
            style="background-color: ${style.bg}; border: 1px solid ${style.border};">
             <span class="text-white text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block"

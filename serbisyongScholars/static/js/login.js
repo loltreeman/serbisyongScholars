@@ -35,7 +35,7 @@ form.addEventListener("submit", async (e) => {
         console.log("LOGIN SUCCESS. ROLE:", userRole);
 
         if (userRole === "ADMIN") {
-            window.location.replace("/api/dashboard/admin");  
+            window.location.replace("/dashboard/admin/");
         } else if (userRole === "MODERATOR") {
             window.location.replace("/moderator/dashboard/"); 
         } else {

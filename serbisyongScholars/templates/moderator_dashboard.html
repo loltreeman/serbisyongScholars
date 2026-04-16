@@ -8,26 +8,43 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
-    
+
     {% include 'partials/navbar.html' %}
-    
+
     <div class="max-w-7xl mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-6">Moderator Dashboard</h1>
-        
+        <h1 class="text-3xl font-bold mb-2">Moderator Dashboard</h1>
+        <p class="text-gray-500 mb-8">Welcome back, {{ request.user.get_full_name|default:request.user.username }}
+            {% if request.user.moderator_profile.office_name %}
+                &mdash; {{ request.user.moderator_profile.office_name }}
+            {% endif %}
+        </p>
+
         <div class="bg-white rounded-lg shadow p-6 mb-6">
             <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <a href="/encode" class="block p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
-                    <h3 class="font-bold text-lg mb-2">Encode Service Hours</h3>
-                    <p class="text-gray-600">Log service hours for scholars</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <a href="/encode/" class="block p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+                    <div class="text-2xl mb-2">📋</div>
+                    <h3 class="font-bold text-lg mb-1">Encode Service Hours</h3>
+                    <p class="text-gray-600 text-sm">Log service hours for scholars</p>
                 </a>
-                <a href="{% url 'announcements_page' %}" class="block p-6 bg-green-50 rounded-lg hover:bg-green-100 transition">
-                    <h3 class="font-bold text-lg mb-2">View Announcements</h3>
-                    <p class="text-gray-600">Check latest announcements</p>
+                <a href="{% url 'manage_announcements' %}" class="block p-6 bg-green-50 rounded-lg hover:bg-green-100 transition">
+                    <div class="text-2xl mb-2">📢</div>
+                    <h3 class="font-bold text-lg mb-1">Manage Announcements</h3>
+                    <p class="text-gray-600 text-sm">Post and review announcements</p>
+                </a>
+                <a href="{% url 'vouchers_page' %}" class="block p-6 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition">
+                    <div class="text-2xl mb-2">🎟️</div>
+                    <h3 class="font-bold text-lg mb-1">Voucher Applications</h3>
+                    <p class="text-gray-600 text-sm">Review scholar voucher applications</p>
+                </a>
+                <a href="{% url 'announcements_bulletin' %}" class="block p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition">
+                    <div class="text-2xl mb-2">📰</div>
+                    <h3 class="font-bold text-lg mb-1">View Announcements</h3>
+                    <p class="text-gray-600 text-sm">Browse all posted announcements</p>
                 </a>
             </div>
         </div>
     </div>
-    
+
 </body>
 </html>

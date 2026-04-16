@@ -14,7 +14,7 @@
                 <a href="{% url 'announcements_bulletin' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Announcements </a> 
                 <a href="{% url 'vouchers_page' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Vouchers </a> 
                 <a href="{% url 'profile_page' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Profile </a> 
-                <a href="/encode" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Encode Hours </a> 
+                <a href="/encode/" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Encode Hours </a> 
                 <a href="{% url 'assign_moderator' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Assign Moderator </a> 
                 
                 {% elif request.user.role == 'MODERATOR' %} 
@@ -22,7 +22,7 @@
                 <a href="{% url 'announcements_bulletin' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Announcements </a>
                 <a href="{% url 'vouchers_page' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Vouchers </a> 
                 <a href="{% url 'profile_page' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Profile </a> 
-                <a href="/encode" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Encode Hours </a> 
+                <a href="/encode/" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Encode Hours </a> 
                 
                 {% else %} 
                 <a href="{% url 'scholar_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > My Dashboard </a> 
@@ -50,7 +50,7 @@
             <a href="{% url 'announcements_bulletin' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Announcements</a> 
             <a href="{% url 'vouchers_page' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Vouchers</a> 
             <a href="{% url 'profile_page' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Profile</a> 
-            <a href="/encode" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Encode Hours</a> 
+            <a href="/encode/" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Encode Hours</a> 
             <a href="{% url 'assign_moderator' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Assign Moderator</a> 
             
             {% elif request.user.role == 'MODERATOR' %} 
@@ -58,7 +58,7 @@
             <a href="{% url 'announcements_bulletin' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Announcements</a>
             <a href="{% url 'vouchers_page' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Vouchers</a> 
             <a href="{% url 'profile_page' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Profile</a> 
-            <a href="/encode" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Encode Hours</a> {% else %} 
+            <a href="/encode/" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Encode Hours</a> {% else %} 
             <a href="{% url 'scholar_dashboard' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >My Dashboard</a> 
             <a href="{% url 'announcements_bulletin' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Announcements</a> 
             <a href="{% url 'vouchers_page' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Vouchers</a> 

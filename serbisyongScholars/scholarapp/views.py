@@ -209,89 +209,29 @@ class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
-        # 1. Map email to username before JWT attempts to authenticate
         login_id = request.data.get('username')
         password = request.data.get('password')
 
+        # Map email to actual username before JWT validation
         if login_id and '@' in login_id:
             try:
                 user_obj = User.objects.get(email__iexact=login_id)
                 request.data['username'] = user_obj.username
             except User.DoesNotExist:
-                pass 
+                pass
 
-        # 2. Call the JWT logic
         response = super().post(request, *args, **kwargs)
-        
-        # 3. Create a Django session so the @login_required decorators work
+
+        # Create a Django session so @login_required template views work
         if response.status_code == 200:
-            from django.contrib.auth import authenticate, login as django_login
-            # Use the actual username from request.data (mapped above)
+            from django.contrib.auth import authenticate
             user = authenticate(
                 username=request.data.get('username'),
-                password=password
+                password=password,
             )
             if user:
                 django_login(request, user)
-                
-        return response
-    
-    serializer_class = MyTokenObtainPairSerializer
 
-    def post(self, request, *args, **kwargs):
-        # 1. Get whatever they typed in the 'username' box
-        login_id = request.data.get('username') 
-        password = request.data.get('password')
-
-        # 2. If they typed an email, find the actual generated username
-        if login_id and '@' in login_id:
-            try:
-                user_obj = User.objects.get(email__iexact=login_id)
-                # Overwrite the 'username' in request data with the REAL username
-                request.data['username'] = user_obj.username
-            except User.DoesNotExist:
-                pass # Let authenticate handle the failure
-
-        # 3. Now call the standard JWT/Django login logic
-        response = super().post(request, *args, **kwargs)
-        
-        if response.status_code == 200:
-            from django.contrib.auth import authenticate
-            # Use the (potentially updated) username from request.data
-            user = authenticate(
-                username=request.data.get('username'),
-                password=password
-            )
-            if user:
-                django_login(request, user)
-                
-        return response
-
-    serializer_class = MyTokenObtainPairSerializer
-
-    def post(self, request, *args, **kwargs):
-        # 1. First, let the JWT library do its job (generate tokens)
-        response = super().post(request, *args, **kwargs)
-        
-        if response.status_code == 200:
-            # 2. Extract credentials from request
-            username = request.data.get('username')
-            password = request.data.get('password')
-            
-            # 3. Use the Django authenticate system
-            from django.contrib.auth import authenticate
-            user = authenticate(username=username, password=password)
-            
-            if user is not None:
-                if user.is_active:
-                    django_login(request, user)
-                else:
-                    # This shouldn't happen if JWT gave a 200, but good for safety
-                    return Response({'error': 'Account is inactive.'}, status=status.HTTP_401_UNAUTHORIZED)
-            else:
-                # If JWT worked but authenticate failed, there's a backend config mismatch
-                print(f"Auth failed for user: {username}") 
-                
         return response
 
 @api_view(['GET'])

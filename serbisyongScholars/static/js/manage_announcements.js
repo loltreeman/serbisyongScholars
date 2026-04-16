@@ -45,7 +45,7 @@ function filterByStatus(status) {
 function renderAnnouncements(announcements) {
     const container = document.getElementById('announcements-container');
     // Get role from localStorage (ensure you saved it during login!)
-    const userRole = localStorage.getItem('role'); 
+    const userRole = localStorage.getItem('userRole');
 
     if (announcements.length === 0) {
         container.innerHTML = `<p class="text-center text-gray-500 py-8">No ${currentStatus.toLowerCase()} announcements</p>`;

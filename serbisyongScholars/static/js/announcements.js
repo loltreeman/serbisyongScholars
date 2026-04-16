@@ -186,7 +186,7 @@ function createAnnouncementCard(announcement) {
             <span class="text-sm text-gray-500">${date}</span>
         </div>
         
-        <div class="cursor-pointer" onclick="window.location.href = '/api/announcements/${announcement.id}/'">
+        <div class="cursor-pointer" onclick="window.location.href = '/announcements/${announcement.id}/'">
             <h3 class="text-xl font-bold text-gray-900 mb-2">
                 ${announcement.title}
             </h3>
