@@ -660,7 +660,6 @@ def user_profile(request):
 
     # --- Scholar fields: editable by self (if scholar) OR admin ---
     if scholar:
-        from .models import ScholarProfile
         if 'school' in payload:
             new_school = payload.get('school')
             if new_school in [c[0] for c in ScholarProfile.SCHOOL_CHOICES]:
