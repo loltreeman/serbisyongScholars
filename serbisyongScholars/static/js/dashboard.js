@@ -193,17 +193,7 @@ async function loadAnnouncements() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    load(); 
-    loadAnnouncements(); 
-});
-
-document.getElementById("logout").addEventListener("click", handleLogout);
-document
-    .getElementById("logout-mobile")
-    .addEventListener("click", handleLogout);
-
-    /**
+/**
  * Load recent vouchers for dashboard widget
  */
 async function loadVouchersWidget() {
