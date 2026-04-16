@@ -14,7 +14,7 @@ async function fetchVouchers(category = 'all') {
 
         const response = await fetch(url, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`, // Adjust based on your auth method
+                'Authorization': `Bearer ${localStorage.getItem('access')}`, // Adjust based on your auth method
                 'Content-Type': 'application/json'
             }
         });
@@ -98,7 +98,7 @@ async function applyForVoucher(voucherId) {
         const response = await fetch(`/api/vouchers/${voucherId}/apply/`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
@@ -147,7 +147,7 @@ async function submitNewVoucher(event) {
         const response = await fetch('/api/vouchers/', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`, 
+                'Authorization': `Bearer ${localStorage.getItem('access')}`, 
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken') 
             },

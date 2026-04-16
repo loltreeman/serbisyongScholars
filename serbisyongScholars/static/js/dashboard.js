@@ -218,9 +218,14 @@ async function loadVouchersWidget() {
             }
         });
         
+        if (!response.ok) {
+            container.innerHTML = '<p class="text-slate-400 text-xs text-center py-4">No vouchers available.</p>';
+            return;
+        }
+
         const vouchers = await response.json();
 
-        if (!vouchers || vouchers.length === 0) {
+        if (!Array.isArray(vouchers) || vouchers.length === 0) {
             container.innerHTML = '<p class="text-slate-400 text-xs text-center py-4">No vouchers available.</p>';
             return;
         }
