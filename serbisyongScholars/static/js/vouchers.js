@@ -87,6 +87,7 @@ function renderVouchers(vouchers) {
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     <span>${voucher.provider}</span>
                 </div>
+                ${USER_ROLE === 'MODERATOR' && voucher.office_name ? `<div class="flex items-center gap-1 text-xs text-indigo-600 mb-3 font-medium"><span>📍</span><span>${voucher.office_name}</span></div>` : ''}
                 <p class="text-gray-600 text-sm mb-4 line-clamp-3">${voucher.description}</p>
 
                 <div class="mt-auto pt-4 border-t border-gray-100">
@@ -390,12 +391,12 @@ function renderPendingApplications(apps) {
             </div>
             
             <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100">
-                ${IS_READONLY_MOD 
-                    ? `<span class="italic text-xs text-gray-400">View only</span>`
-                    : `
+                ${CAN_MANAGE_APPLICATIONS 
+                    ? `
                     <button onclick="handleApplicationAction(${app.id}, 'approve')" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded-lg transition shadow-sm">APPROVE</button>
                     <button onclick="handleApplicationAction(${app.id}, 'reject')" class="flex-1 bg-white border border-red-100 hover:bg-red-50 text-red-600 text-xs font-bold py-2 rounded-lg transition">REJECT</button>
                     `
+                    : `<span class="italic text-xs text-gray-400">View only</span>`
                 }
             </div>
         </div>
@@ -553,6 +554,8 @@ function renderVoucherSubmissions(subs) {
         let statusBadge = v.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
                          v.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
                          v.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800';
+        
+        let statusText = v.status === 'PENDING' ? 'Awaiting Approval' : v.status_display;
                          
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -560,19 +563,24 @@ function renderVoucherSubmissions(subs) {
                 <div class="font-bold text-gray-900">${v.title}</div>
                 <div class="text-[10px] text-gray-500">${v.category} | ${v.provider}</div>
             </td>
-            <td class="px-4 py-3 text-gray-600 text-xs">${v.created_by_name}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs font-medium">${v.office_name || 'Unassigned'}</td>
             <td class="px-4 py-3">
-                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${statusBadge}">${v.status_display}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold whitespace-nowrap ${statusBadge}">${statusText}</span>
+                ${v.status === 'PENDING' ? `<div class="text-[10px] text-blue-600 mt-1 font-medium">⏱ Waiting for admin</div>` : ''}
                 ${v.rejection_reason ? `<div class="text-[10px] text-red-500 mt-1 italic">"${v.rejection_reason}"</div>` : ''}
             </td>
             <td class="px-4 py-3 text-gray-500 text-xs">${new Date(v.created_at).toLocaleDateString()}</td>
             <td class="px-4 py-3">
                 ${IS_ADMIN && v.status === 'PENDING' 
                     ? `<div class="flex gap-2">
-                        <button onclick="handleVoucherApproval(${v.id}, 'approve')" class="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-green-700">APPROVE</button>
-                        <button onclick="handleVoucherApproval(${v.id}, 'reject')" class="bg-white border border-red-200 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-50">REJECT</button>
+                        <button onclick="handleVoucherApproval(${v.id}, 'approve')" class="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-green-700 transition">APPROVE</button>
+                        <button onclick="handleVoucherApproval(${v.id}, 'reject')" class="bg-white border border-red-200 text-red-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-50 transition">REJECT</button>
                       </div>`
-                    : '<span class="text-gray-400 text-xs">No pending actions</span>'}
+                    : IS_ADMIN && v.status !== 'PENDING'
+                    ? '<span class="text-gray-400 text-xs">' + (v.status === 'ACTIVE' ? 'Active' : 'Reviewed') + '</span>'
+                    : v.status === 'PENDING'
+                    ? '<span class="text-blue-600 text-xs font-medium">Pending review...</span>'
+                    : '<span class="text-gray-400 text-xs">Completed</span>'}
             </td>
         `;
         tableBody.appendChild(row);

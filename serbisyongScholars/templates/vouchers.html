@@ -18,13 +18,19 @@
         <div class="mb-8 flex justify-between items-center">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900">Available Vouchers & Rewards</h1>
-                <p class="text-gray-600 mt-2">Sign up for food stubs, tickets, and other rewards</p>
+                <p class="text-gray-600 mt-2">
+                    {% if request.user.role == 'MODERATOR' %}
+                    Vouchers available for your office
+                    {% else %}
+                    Sign up for food stubs, tickets, and other rewards
+                    {% endif %}
+                </p>
             </div>
 
             {% if can_create_voucher %}
             <button onclick="openCreateModal()"
                 class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-150">
-                + Create Voucher
+                + Propose Voucher
             </button>
             {% endif %}
         </div>
@@ -172,17 +178,21 @@
 
         <div id="applications-section" class="space-y-12">
             {% if can_manage_applications %}
-            <!-- SECTION 1: Voucher Proposals (Moderator -> Admin Approval) -->
-            <div id="voucher-submissions-section" class="bg-white rounded-lg shadow p-6">
+            
+            <!-- MODERATOR SECTION: Voucher Submissions (Moderator Proposals) -->
+            <div id="voucher-submissions-section" class="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <h2 class="text-xl font-bold text-gray-800">Voucher Submissions and History</h2>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">My Voucher Submissions</h2>
+                        <p class="text-sm text-gray-500 mt-1">Vouchers you've submitted for admin approval</p>
+                    </div>
 
                     <div class="flex flex-wrap gap-2 text-sm">
                         <input type="text" id="v-sub-search" placeholder="Search title or provider..."
                             class="border rounded px-2 py-1 w-full md:w-auto" onkeyup="applyVoucherSubFilters()">
                         <select id="v-sub-status" class="border rounded px-2 py-1" onchange="loadVoucherSubmissions()">
                             <option value="all">All statuses</option>
-                            <option value="PENDING">Pending Approval</option>
+                            <option value="PENDING">Awaiting Approval</option>
                             <option value="ACTIVE">Approved/Active</option>
                             <option value="REJECTED">Declined</option>
                         </select>
@@ -193,14 +203,11 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher
-                                    Title</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creator</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Office</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date
-                                    Submitted</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions /
-                                    Notes</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Submitted</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions / Notes</th>
                             </tr>
                         </thead>
                         <tbody id="voucher-sub-table-body" class="bg-white divide-y divide-gray-200 text-sm">
@@ -210,17 +217,18 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: Pending Applications (Scholar -> Moderator Approval) -->
+            <!-- ADMIN SECTION: Pending Scholar Requests (Applications to Approve) -->
             <div id="admin-pending-section" class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    Pending Scholar Requests
-                </h2>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800 mb-2">Pending Scholar Requests</h2>
+                    <p class="text-sm text-gray-500 mb-4">Scholar applications awaiting your approval</p>
+                </div>
                 <div id="admin-applications-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     Loading applications...
                 </div>
             </div>
 
-            <!-- SECTION 3: Application History (Scholar Results) -->
+            <!-- ADMIN SECTION: Application History (Scholar Results) -->
             <div id="history-section" class="bg-white rounded-lg shadow p-6">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <h2 class="text-xl font-bold text-gray-800">Scholar Voucher History</h2>
@@ -277,7 +285,6 @@
     <script>
         const USER_ROLE = "{{ request.user.role }}";
         const CAN_MANAGE_APPLICATIONS = "{{ can_manage_applications|yesno:'true,false' }}" === 'true';
-        const IS_READONLY_MOD = "{{ is_readonly_mod|yesno:'true,false' }}" === 'true';
         const CURRENT_USERNAME = "{{ current_username }}";
         const IS_ADMIN = USER_ROLE === 'ADMIN';
         const CAN_EDIT_VOUCHER_GLOBAL = "{{ can_create_voucher|yesno:'true,false' }}" === 'true';

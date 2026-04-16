@@ -100,14 +100,16 @@ class ScholarProfile(models.Model):
 class ModeratorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='moderator_profile')
     office_name = models.CharField(max_length=200) # Matches the office_name format in ServiceLog
+    office = models.ForeignKey(Office, on_delete=models.PROTECT, related_name='moderators', null=True, blank=True)
 
     class Meta:
         indexes = [
             models.Index(fields=['user']),
+            models.Index(fields=['office']),
         ]
 
     def __str__(self):
-        return f"Moderator: {self.user.username}"
+        return f"Moderator: {self.user.username} ({self.office.name if self.office else 'Unassigned'})"
     
 class ServiceLog(models.Model):
     scholar = models.ForeignKey(ScholarProfile, on_delete=models.CASCADE, related_name='service_logs', db_index=True)
@@ -202,6 +204,7 @@ class Voucher(models.Model):
     description = models.TextField()
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     provider = models.CharField(max_length=100)  # e.g., "EBAIS", "Kitchen City"
+    office = models.ForeignKey(Office, on_delete=models.PROTECT, related_name='vouchers', null=True, blank=True)
     total_slots = models.IntegerField()
     remaining_slots = models.IntegerField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
@@ -216,6 +219,10 @@ class Voucher(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['office', 'status']),
+            models.Index(fields=['created_by']),
+        ]
     
     def is_available(self):
         """Check if voucher is still available"""

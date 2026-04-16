@@ -1079,11 +1079,21 @@ def vouchers_list(request):
         # Admins see all
         elif role == 'ADMIN':
             vouchers = Voucher.objects.all()
-        # Moderators see active vouchers + their own pending/rejected ones
+        # Moderators see active vouchers in their office + their own pending/rejected ones
         else:
-            vouchers = Voucher.objects.filter(
-                Q(status__in=['ACTIVE', 'FULL', 'EXPIRED']) | Q(created_by=user)
-            )
+            try:
+                moderator_office = user.moderator_profile.office
+                if moderator_office:
+                    vouchers = Voucher.objects.filter(
+                        Q(office=moderator_office, status__in=['ACTIVE', 'FULL', 'EXPIRED']) | 
+                        Q(created_by=user)
+                    )
+                else:
+                    # If moderator has no office assigned, only see their own vouchers
+                    vouchers = Voucher.objects.filter(created_by=user)
+            except:
+                # If moderator_profile doesn't exist, only see own vouchers
+                vouchers = Voucher.objects.filter(created_by=user)
         
         # Filter by category if provided
         category = request.GET.get('category')
@@ -1099,9 +1109,9 @@ def vouchers_list(request):
         return Response(serializer.data)
     
     elif request.method == 'POST':
-        # Only ADMIN or OAA moderators can create vouchers
-        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
-            return Response({'error': 'Only OAA moderators and admins can create vouchers'}, status=403)
+        # Only ADMIN or any MODERATOR can create vouchers
+        if not (request.user.role == 'ADMIN' or request.user.role == 'MODERATOR'):
+            return Response({'error': 'Only moderators and admins can create vouchers'}, status=403)
         
         serializer = VoucherSerializer(data=request.data)
         if serializer.is_valid():
@@ -1110,10 +1120,19 @@ def vouchers_list(request):
             # Admins create active vouchers; Moderators create pending ones
             initial_status = 'ACTIVE' if request.user.role == 'ADMIN' else 'PENDING'
             
+            # Get moderator's office if they are a moderator
+            office = None
+            if request.user.role == 'MODERATOR':
+                try:
+                    office = request.user.moderator_profile.office
+                except:
+                    pass
+            
             serializer.save(
                 created_by=request.user,
                 remaining_slots=total_slots,
-                status=initial_status
+                status=initial_status,
+                office=office
             )
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
@@ -1202,8 +1221,10 @@ def voucher_detail(request, voucher_id):
         return Response(serializer.errors, status=400)
 
     elif request.method == 'DELETE':
-        if not (role == 'ADMIN' or is_oaa_mod(user)):
-            return Response({'error': 'Only OAA moderators and admins can delete vouchers'}, status=403)
+        # ADMIN can delete any voucher; MODERATOR can only delete their own pending vouchers
+        can_delete = request.user.role == 'ADMIN' or (request.user == voucher.created_by and voucher.status == 'PENDING')
+        if not can_delete:
+            return Response({'error': 'Not authorized to delete this voucher'}, status=403)
         
         force = request.query_params.get('force') == 'true'
         pending_count = VoucherApplication.objects.filter(voucher=voucher, status='PENDING').count()
@@ -1330,15 +1351,20 @@ def voucher_applications_list(request):
 
     user = request.user
 
-    if user.role == 'ADMIN' or is_oaa_mod(user):
+    if user.role == 'ADMIN':
         applications = VoucherApplication.objects.all()
     elif user.role == 'MODERATOR':
         try:
-            office = user.moderator_profile.office_name
-            applications = VoucherApplication.objects.filter(
-                Q(voucher__created_by=user) |
-                Q(voucher__provider__icontains=office)
-            )
+            moderator_office = user.moderator_profile.office
+            if moderator_office:
+                # Moderators see applications for vouchers they created or vouchers in their office
+                applications = VoucherApplication.objects.filter(
+                    Q(voucher__created_by=user) |
+                    Q(voucher__office=moderator_office)
+                )
+            else:
+                # If moderator has no office, only see own applications
+                applications = VoucherApplication.objects.filter(voucher__created_by=user)
         except Exception:
             applications = VoucherApplication.objects.none()
     else:
@@ -1375,7 +1401,6 @@ def approve_voucher_application(request, application_id):
     user = request.user
     can_approve = (
         user.role == 'ADMIN' or
-        is_oaa_mod(user) or
         (user.role == 'MODERATOR' and application.voucher.created_by == user)
     )
     if not can_approve:
@@ -1423,17 +1448,12 @@ def approve_voucher_application(request, application_id):
 @login_required
 def vouchers_page(request):
     user = request.user
-    can_create = user.role == 'ADMIN' or is_oaa_mod(user)
+    can_create = user.role in ('ADMIN', 'MODERATOR')
     can_manage = user.role in ('ADMIN', 'MODERATOR')
-
-    # Non-OAA mods can see applications for their office but not approve them
-    is_readonly_mod = user.role == 'MODERATOR' and not is_oaa_mod(user)
 
     return render(request, 'vouchers.html', {
         'can_create_voucher': can_create,
         'can_manage_applications': can_manage,
-        'is_oaa_mod': is_oaa_mod(user),
-        'is_readonly_mod': is_readonly_mod,
         'current_username': user.username,
     })
 

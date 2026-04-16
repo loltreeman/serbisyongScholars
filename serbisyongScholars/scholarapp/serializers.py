@@ -167,6 +167,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 class VoucherSerializer(serializers.ModelSerializer):
     is_available = serializers.BooleanField(read_only=True)
     created_by_name = serializers.SerializerMethodField()
+    office_name = serializers.CharField(source='office.name', read_only=True)
 
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
@@ -191,11 +192,11 @@ class VoucherSerializer(serializers.ModelSerializer):
     class Meta:
         model = Voucher
         fields = [
-            'id', 'title', 'description', 'category', 'provider',
+            'id', 'title', 'description', 'category', 'provider', 'office', 'office_name',
             'total_slots', 'remaining_slots', 'status', 'status_display', 'rejection_reason', 'expiry_date',
             'created_at', 'created_by_name', 'created_by_username', 'image_url', 'is_available'
         ]
-        read_only_fields = ['remaining_slots', 'created_by', 'status', 'rejection_reason']
+        read_only_fields = ['remaining_slots', 'created_by', 'status', 'rejection_reason', 'office']
 
 
 class VoucherApplicationSerializer(serializers.ModelSerializer):
