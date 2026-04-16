@@ -168,6 +168,7 @@ class VoucherSerializer(serializers.ModelSerializer):
     is_available = serializers.BooleanField(read_only=True)
     created_by_name = serializers.SerializerMethodField()
     office_name = serializers.CharField(source='office.name', read_only=True)
+    scholar_application_status = serializers.SerializerMethodField()
 
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
@@ -184,6 +185,25 @@ class VoucherSerializer(serializers.ModelSerializer):
             return f"{name} - {office}"
         return name
 
+    def get_scholar_application_status(self, obj):
+        """Get the current scholar's application status for this voucher (if scholar)."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Only scholars get this info; others get None
+        if request.user.role != 'SCHOLAR':
+            return None
+        
+        # Find if scholar has applied to this voucher
+        from .models import VoucherApplication
+        app = VoucherApplication.objects.filter(
+            voucher=obj,
+            scholar=request.user
+        ).values_list('status', flat=True).first()
+        
+        return app
+
     def validate_expiry_date(self, value):
         if value < date.today():
             raise serializers.ValidationError('Expiry date cannot be yesterday or in the past.')
@@ -194,9 +214,9 @@ class VoucherSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'category', 'provider', 'office', 'office_name',
             'total_slots', 'remaining_slots', 'status', 'status_display', 'rejection_reason', 'expiry_date',
-            'created_at', 'created_by_name', 'created_by_username', 'image_url', 'is_available'
+            'created_at', 'created_by_name', 'created_by_username', 'image_url', 'is_available', 'scholar_application_status'
         ]
-        read_only_fields = ['remaining_slots', 'created_by', 'status', 'rejection_reason', 'office']
+        read_only_fields = ['remaining_slots', 'created_by', 'status', 'rejection_reason', 'office', 'scholar_application_status']
 
 
 class VoucherApplicationSerializer(serializers.ModelSerializer):

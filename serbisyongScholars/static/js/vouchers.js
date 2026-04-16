@@ -66,6 +66,9 @@ function renderVouchers(vouchers) {
     const canApply = USER_ROLE === 'SCHOLAR';
 
     vouchers.forEach(voucher => {
+        // For scholars: only show Apply button if no existing application
+        const hasExistingApplication = USER_ROLE === 'SCHOLAR' && voucher.scholar_application_status;
+
         const percentageLeft = (voucher.remaining_slots / voucher.total_slots) * 100;
         let badgeColor = percentageLeft > 20 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 
@@ -97,11 +100,15 @@ function renderVouchers(vouchers) {
                     </div>
                     
                     <div class="flex flex-col gap-2">
-                        ${canApply
+                        ${canApply && !hasExistingApplication
                             ? `<button onclick="applyForVoucher(${voucher.id})"
                                     class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150 shadow-sm">
                                 Apply Now
                               </button>`
+                            : canApply && hasExistingApplication
+                            ? `<div class="w-full bg-gray-100 text-gray-600 font-medium py-2 px-4 rounded-lg text-center text-sm">
+                                Applied (${voucher.scholar_application_status})
+                              </div>`
                             : ''
                         }
 

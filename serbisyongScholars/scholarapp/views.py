@@ -1105,7 +1105,11 @@ def vouchers_list(request):
         if status_filter:
             vouchers = vouchers.filter(status=status_filter)
         
-        serializer = VoucherSerializer(vouchers.distinct(), many=True)
+        serializer = VoucherSerializer(
+            vouchers.distinct(), 
+            many=True,
+            context={'request': request}
+        )
         return Response(serializer.data)
     
     elif request.method == 'POST':
