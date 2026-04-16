@@ -1,0 +1,86 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Audit Logs - serbisyongScholar</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
+    </head>
+    <body class="bg-slate-50 text-slate-900 mb-20 md:mb-0">
+        {% include 'partials/navbar.html' %}
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+            <div class="flex flex-col gap-4 mb-8">
+                <div>
+                    <h1 class="text-3xl font-bold">Audit Logs</h1>
+                    <p class="mt-2 text-slate-600">
+                        Review scholar service log entries, filter by student ID, name, office, and date range.
+                    </p>
+                </div>
+                <div class="grid gap-4 md:grid-cols-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Search</label>
+                        <input id="search-input" type="text" placeholder="Student ID, name, activity, office"
+                            class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Office</label>
+                        <input id="office-input" type="text" placeholder="Office name"
+                            class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">From</label>
+                        <input id="start-date" type="date"
+                            class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">To</label>
+                        <input id="end-date" type="date"
+                            class="w-full rounded-xl border border-slate-300 px-4 py-3 focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-sm text-slate-600">
+                        Showing <span id="audit-count">0</span> audit entries.
+                    </div>
+                    <div class="flex flex-col gap-3 sm:flex-row">
+                        <button id="clear-filters" class="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition">Clear Filters</button>
+                        <button id="refresh-button" class="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition">Refresh</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white shadow-sm rounded-3xl overflow-hidden border border-slate-200">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm font-medium text-slate-700">
+                        <thead class="bg-slate-50 text-slate-900">
+                            <tr>
+                                <th class="px-5 py-4">Rendered</th>
+                                <th class="px-5 py-4">Scholar</th>
+                                <th class="px-5 py-4">Student ID</th>
+                                <th class="px-5 py-4">Office</th>
+                                <th class="px-5 py-4">Activity</th>
+                                <th class="px-5 py-4">Hours</th>
+                                <th class="px-5 py-4">Submitted By</th>
+                                <th class="px-5 py-4">Created</th>
+                                <th class="px-5 py-4">Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body" class="bg-white divide-y divide-slate-200">
+                            <tr>
+                                <td class="px-5 py-16 text-center text-slate-500" colspan="9">
+                                    Loading audit entries...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <script src="{% static 'js/audit_logs.js' %}"></script>
+    </body>
+</html>

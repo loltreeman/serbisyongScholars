@@ -298,6 +298,72 @@ def admin_dashboard_view(request):
     
     return render(request, 'admin_dashboard.html')
 
+@login_required(login_url='/login/')
+def audit_logs_page(request):
+    """Render the audit logs page for admins."""
+    if request.user.role != 'ADMIN':
+        return HttpResponseForbidden("Admin access required")
+    return render(request, 'audit_logs.html')
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_audit_logs_list(request):
+    """Return audit log entries for admin review."""
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin access required'}, status=403)
+
+    search_query = (request.GET.get('search', '') or '').strip()
+    office_filter = (request.GET.get('office', '') or '').strip()
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    logs = ServiceLog.objects.select_related('scholar__user', 'created_by')
+
+    if search_query:
+        logs = logs.filter(
+            Q(scholar__student_id__icontains=search_query) |
+            Q(scholar__user__username__icontains=search_query) |
+            Q(scholar__user__first_name__icontains=search_query) |
+            Q(scholar__user__last_name__icontains=search_query) |
+            Q(activity_description__icontains=search_query) |
+            Q(office_name__icontains=search_query)
+        )
+
+    if office_filter:
+        logs = logs.filter(office_name__icontains=office_filter)
+
+    if start_date:
+        try:
+            logs = logs.filter(date_rendered__gte=start_date)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            logs = logs.filter(date_rendered__lte=end_date)
+        except ValueError:
+            pass
+
+    logs = logs.order_by('-date_rendered', '-created_at')[:250]
+
+    data = [
+        {
+            'id': log.id,
+            'student_id': log.scholar.student_id,
+            'scholar_name': f"{log.scholar.user.first_name} {log.scholar.user.last_name}".strip(),
+            'date_rendered': log.date_rendered,
+            'hours': log.hours,
+            'office_name': log.office_name,
+            'activity_description': log.activity_description,
+            'submitted_by': log.created_by.username if log.created_by else 'Unknown',
+            'created_at': log.created_at,
+            'updated_at': log.updated_at,
+        }
+        for log in logs
+    ]
+
+    return Response({'logs': data, 'count': len(data)})
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def admin_scholars_list(request):

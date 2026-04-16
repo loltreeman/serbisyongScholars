@@ -11,6 +11,7 @@
             <div class="hidden md:flex items-center space-x-2"> 
                 {% if request.user.role == 'ADMIN' %} 
                 <a href="{% url 'admin_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition"> Dashboard </a> 
+                <a href="{% url 'audit_logs' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Audit Logs </a> 
                 <a href="{% url 'announcements_bulletin' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Announcements </a> 
                 <a href="{% url 'vouchers_page' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Vouchers </a> 
                 <a href="{% url 'profile_page' %}" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-800 hover:text-yellow-400 transition" > Profile </a> 
@@ -47,6 +48,7 @@
         <div id="mobile-menu" class="hidden md:hidden pb-4 space-y-2"> 
             {% if request.user.role == 'ADMIN' %} 
             <a href="{% url 'admin_dashboard' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Dashboard</a> 
+            <a href="{% url 'audit_logs' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Audit Logs</a> 
             <a href="{% url 'announcements_bulletin' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Announcements</a> 
             <a href="{% url 'vouchers_page' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Vouchers</a> 
             <a href="{% url 'profile_page' %}" class="block px-3 py-2 rounded-md hover:bg-blue-800" >Profile</a> 
