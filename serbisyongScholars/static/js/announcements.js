@@ -30,11 +30,11 @@ const CATEGORY_INFO = {
 };
 
 // Load announcements on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     bindCategoryFilters();
     bindSearchFilter();
-    loadAnnouncements();
-    checkUserRole();
+    await syncCurrentUser();
+    await loadAnnouncements();
 });
 
 function bindSearchFilter() {
@@ -47,22 +47,64 @@ function bindSearchFilter() {
 }
 
 /**
- * Check if user is admin to show create button
+ * Apply the trusted server role to the page state
  */
-function checkUserRole() {
-    const userRole = localStorage.getItem('userRole');
-    console.log('User Role:', userRole);
-    
+function applyUserRole(userRole) {
+    const createBtn = document.getElementById('admin-controls');
+    const buttonText = createBtn?.querySelector('button');
+
+    if (!createBtn || !buttonText) {
+        return;
+    }
+
     if (userRole === 'ADMIN' || userRole === 'MODERATOR') {
-        const createBtn = document.getElementById('admin-controls');
         createBtn.classList.remove('hidden');
-        
+
         if (userRole === 'MODERATOR') {
-            const buttonText = createBtn.querySelector('button');
-            if (buttonText) {
-                buttonText.textContent = '➕ Submit Announcement for Approval';
-            }
+            buttonText.textContent = '➕ Submit Announcement for Approval';
+            return;
         }
+
+        buttonText.textContent = '➕ Create New Announcement';
+        return;
+    }
+
+    createBtn.classList.add('hidden');
+    buttonText.textContent = '➕ Create New Announcement';
+}
+
+async function syncCurrentUser() {
+    const accessToken = localStorage.getItem('access');
+    if (!accessToken) {
+        applyUserRole(null);
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/auth/me/', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            },
+            credentials: 'omit'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch current user');
+        }
+
+        const user = await response.json();
+        localStorage.setItem('userRole', user.role || '');
+        localStorage.setItem('loggedInUsername', user.username || '');
+        localStorage.setItem('officeName', user.office_name || '');
+        localStorage.setItem('isOaaMod', user.is_oaa_mod ? 'true' : 'false');
+        applyUserRole(user.role);
+    } catch (error) {
+        console.error('Error syncing current user:', error);
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('loggedInUsername');
+        localStorage.removeItem('officeName');
+        localStorage.removeItem('isOaaMod');
+        applyUserRole(null);
     }
 }
 
@@ -74,7 +116,8 @@ async function loadAnnouncements() {
         const response = await fetch('/api/announcements/', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('access')}`  
-            }
+            },
+            credentials: 'omit'
         });
         
         if (!response.ok) throw new Error('Failed to load announcements');
@@ -137,7 +180,7 @@ function createAnnouncementCard(announcement) {
     });
     
     const userRole = localStorage.getItem('userRole');
-    const currentUser = localStorage.getItem('loggedInUsername');
+    const currentUser = localStorage.getItem('loggedInUsername') || '';
     
     // Determine if we should show status badge
     let showStatusBadge = false;
@@ -359,6 +402,7 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
                 'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
+            credentials: 'omit',
             body: JSON.stringify(data)
         });
         
@@ -413,6 +457,7 @@ async function deleteAnnouncement(id) {
                 'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
+            credentials: 'omit',
             body: JSON.stringify({ id })
         });
         
@@ -457,6 +502,7 @@ async function approveAnnouncement(id) {
                 'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
+            credentials: 'omit',
             body: JSON.stringify({ action: 'approve' })
         });
         
@@ -494,6 +540,7 @@ async function rejectAnnouncementWithReason(id) {
                 'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
+            credentials: 'omit',
             body: JSON.stringify({ 
                 action: 'reject',
                 rejection_reason: reason || 'No reason provided'

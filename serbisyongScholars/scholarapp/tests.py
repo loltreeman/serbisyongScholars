@@ -507,7 +507,65 @@ class AnnouncementCategoryTests(TestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.json()['error'], 'Admin only')
+        self.assertEqual(response.json()['error'], 'Only admins and moderators can create announcements')
+
+
+class AnnouncementPermissionSyncTests(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        self.list_url = reverse('announcements_list')
+        self.current_user_url = reverse('api_current_user')
+
+        self.moderator = User.objects.create_user(
+            username='actualmoderator',
+            email='actualmoderator@ateneo.edu',
+            password='TestPass123!',
+            role='MODERATOR',
+            is_email_verified=True,
+        )
+
+        self.profile_only_moderator = User.objects.create_user(
+            username='profilemod',
+            email='profilemod@ateneo.edu',
+            password='TestPass123!',
+            role='SCHOLAR',
+            is_email_verified=True,
+        )
+        ModeratorProfile.objects.create(
+            user=self.profile_only_moderator,
+            office_name='Office of Admission and Aid',
+        )
+
+    def test_moderator_can_create_pending_announcement(self):
+        self.api_client.force_authenticate(user=self.moderator)
+        response = self.api_client.post(self.list_url, {
+            'title': 'Moderator post',
+            'content': 'Needs approval.',
+            'category': 'GENERAL',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()['status'], 'PENDING')
+
+    def test_profile_backed_moderator_can_create_pending_announcement(self):
+        self.api_client.force_authenticate(user=self.profile_only_moderator)
+        response = self.api_client.post(self.list_url, {
+            'title': 'Profile-backed moderator post',
+            'content': 'Also needs approval.',
+            'category': 'GENERAL',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()['status'], 'PENDING')
+
+    def test_current_user_endpoint_returns_effective_role(self):
+        self.api_client.force_authenticate(user=self.profile_only_moderator)
+        response = self.api_client.get(self.current_user_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['role'], 'MODERATOR')
+        self.assertEqual(response.json()['office_name'], 'Office of Admission and Aid')
+        self.assertTrue(response.json()['is_oaa_mod'])
 
 class VoucherSystemTests(APITestCase):
     def setUp(self):

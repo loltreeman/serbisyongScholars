@@ -2,6 +2,7 @@ import threading
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login as django_login
+from django.contrib.auth import logout as django_logout
 from django.contrib.auth.decorators import login_required
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -91,6 +92,18 @@ def get_available_offices():
     return sorted(offices, key=str.casefold)
 
 
+def get_effective_role(user):
+    if not getattr(user, 'is_authenticated', False):
+        return None
+    return user.effective_role
+
+
+def get_assigned_office(user):
+    if not getattr(user, 'is_authenticated', False):
+        return None
+    return user.assigned_office
+
+
 # Register a new user by default it is a scholar
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -166,13 +179,12 @@ def verify_email(request):
     
 def is_oaa_mod(user):
     """Returns True if the user is a moderator for the OAA office."""
-    if user.role != 'MODERATOR':
+    if get_effective_role(user) != 'MODERATOR':
         return False
-    try:
-        office = user.moderator_profile.office_name.lower()
-        return 'oaa' in office or 'admission and aid' in office
-    except Exception:
+    office = (get_assigned_office(user) or '').lower()
+    if not office:
         return False
+    return 'oaa' in office or 'admission and aid' in office
 
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -189,18 +201,12 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Standard JWT validation
         data = super().validate(attrs)
 
-        office_name = None
-        try:
-            office_name = self.user.moderator_profile.office_name
-        except Exception:
-            pass
-
         # Add user info for the frontend
         data['user'] = {
             'username': self.user.username,
             'email': self.user.email,
-            'role': self.user.role,
-            'office_name': office_name,
+            'role': get_effective_role(self.user),
+            'office_name': get_assigned_office(self.user),
             'is_oaa_mod': is_oaa_mod(self.user),
         }
         return data
@@ -233,6 +239,25 @@ class MyTokenObtainPairView(TokenObtainPairView):
                 django_login(request, user)
 
         return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    return Response({
+        'username': request.user.username,
+        'email': request.user.email,
+        'role': get_effective_role(request.user),
+        'office_name': get_assigned_office(request.user),
+        'is_oaa_mod': is_oaa_mod(request.user),
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def logout_view(request):
+    django_logout(request)
+    return Response({'message': 'Logged out successfully.'}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 def get_scholar_dashboard(request):
@@ -668,7 +693,7 @@ def assign_moderator(request):
 def create_service_log(request):
 
     # Checks if user is either ADMIN or MOD, the only people allowed to encode
-    if request.user.role not in ['ADMIN', 'MODERATOR']:
+    if get_effective_role(request.user) not in ['ADMIN', 'MODERATOR']:
         return Response(
             {'error': 'Only admins and moderators can create service logs.'},
             status=status.HTTP_403_FORBIDDEN
@@ -712,14 +737,15 @@ def update_dormer_status(request):
 @permission_classes([IsAuthenticated])
 def announcements_list(request):
     """List, create, update, or delete announcements"""
+    user_role = get_effective_role(request.user)
     
     if request.method == 'GET':
         # Scholars: Only see APPROVED announcements
         # Moderators: See APPROVED + their own PENDING/REJECTED announcements
         # Admins: See ALL announcements
-        if request.user.role == 'ADMIN':
+        if user_role == 'ADMIN':
             announcements = Announcement.objects.all().order_by('-created_at')
-        elif request.user.role == 'MODERATOR':
+        elif user_role == 'MODERATOR':
             # Moderators see: approved announcements + ALL their own announcements (pending/rejected)
             announcements = Announcement.objects.filter(
                 Q(status='APPROVED') | Q(author=request.user)
@@ -732,13 +758,13 @@ def announcements_list(request):
     
     elif request.method == 'POST':
         # Both ADMIN and MODERATOR can create announcements
-        if request.user.role not in ['ADMIN', 'MODERATOR']:
+        if user_role not in ['ADMIN', 'MODERATOR']:
             return Response({'error': 'Only admins and moderators can create announcements'}, status=403)
         
         serializer = AnnouncementSerializer(data=request.data)
         if serializer.is_valid():
             # ADMIN posts go live immediately, MODERATOR posts need approval
-            if request.user.role == 'ADMIN':
+            if user_role == 'ADMIN':
                 serializer.save(author=request.user, status='APPROVED')
             else:  # MODERATOR
                 serializer.save(author=request.user, status='PENDING')
@@ -758,18 +784,18 @@ def announcements_list(request):
         
         # MODERATOR can only edit their own PENDING or REJECTED announcements
         # ADMIN can edit any announcement
-        if request.user.role == 'MODERATOR':
+        if user_role == 'MODERATOR':
             if announcement.author != request.user:
                 return Response({'error': 'You can only edit your own announcements'}, status=403)
             if announcement.status not in ('PENDING', 'REJECTED'):
                 return Response({'error': 'You can only edit pending or rejected announcements'}, status=403)
-        elif request.user.role != 'ADMIN':
+        elif user_role != 'ADMIN':
             return Response({'error': 'Unauthorized'}, status=403)
 
         serializer = AnnouncementSerializer(announcement, data=request.data, partial=True)
         if serializer.is_valid():
             # Editing a rejected announcement resubmits it for approval
-            if request.user.role == 'MODERATOR' and announcement.status == 'REJECTED':
+            if user_role == 'MODERATOR' and announcement.status == 'REJECTED':
                 serializer.save(status='PENDING', rejection_reason='')
             else:
                 serializer.save()
@@ -788,12 +814,12 @@ def announcements_list(request):
         
         # MODERATOR can only delete their own PENDING announcements
         # ADMIN can delete any announcement
-        if request.user.role == 'MODERATOR':
+        if user_role == 'MODERATOR':
             if announcement.author != request.user:
                 return Response({'error': 'You can only delete your own announcements'}, status=403)
             if announcement.status != 'PENDING':
                 return Response({'error': 'You can only delete pending announcements'}, status=403)
-        elif request.user.role != 'ADMIN':
+        elif user_role != 'ADMIN':
             return Response({'error': 'Unauthorized'}, status=403)
         
         announcement.delete()
@@ -803,7 +829,7 @@ def announcements_list(request):
 @permission_classes([IsAuthenticated])
 def approve_announcement(request, announcement_id):
     """Admin approves or rejects a pending announcement"""
-    if request.user.role != 'ADMIN':
+    if get_effective_role(request.user) != 'ADMIN':
         return Response({'error': 'Admin only'}, status=403)
     
     action = request.data.get('action')  
@@ -850,9 +876,10 @@ def announcement_detail_view(request, announcement_id):
 @login_required(login_url='/login/')
 def dashboard_router(request):
     """Route users to appropriate dashboard based on role"""
-    if request.user.role == 'ADMIN':
+    user_role = get_effective_role(request.user)
+    if user_role == 'ADMIN':
         return redirect('admin_dashboard')
-    elif request.user.role == 'MODERATOR':
+    elif user_role == 'MODERATOR':
         return redirect('moderator_dashboard')  
     else:  
         return redirect('scholar_dashboard')
@@ -860,7 +887,7 @@ def dashboard_router(request):
 @login_required(login_url='/login/')
 def manage_announcements_view(request):
     """Render the management page for Admins/Moderators"""
-    if request.user.role not in ['ADMIN', 'MODERATOR']:
+    if get_effective_role(request.user) not in ['ADMIN', 'MODERATOR']:
         return HttpResponseForbidden("You do not have permission to manage announcements.")
     
     return render(request, 'manage_announcements.html')

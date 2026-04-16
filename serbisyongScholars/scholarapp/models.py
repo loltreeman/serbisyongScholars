@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Sum, F, Q
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
@@ -27,6 +28,24 @@ class User(AbstractUser):
         indexes = [
             models.Index(fields=['role', 'is_email_verified']),
         ]
+
+    @property
+    def effective_role(self):
+        if self.role in ('ADMIN', 'MODERATOR'):
+            return self.role
+
+        try:
+            self.moderator_profile
+            return 'MODERATOR'
+        except ObjectDoesNotExist:
+            return self.role
+
+    @property
+    def assigned_office(self):
+        try:
+            return self.moderator_profile.office_name
+        except ObjectDoesNotExist:
+            return None
 
     def __str__(self):
         return f"{self.username} ({self.role})"

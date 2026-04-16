@@ -14,8 +14,8 @@
     <div class="max-w-7xl mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold mb-2">Moderator Dashboard</h1>
         <p class="text-gray-500 mb-8">Welcome back, {{ request.user.get_full_name|default:request.user.username }}
-            {% if request.user.moderator_profile.office_name %}
-                &mdash; {{ request.user.moderator_profile.office_name }}
+            {% if request.user.assigned_office %}
+                &mdash; {{ request.user.assigned_office }}
             {% endif %}
         </p>
 
