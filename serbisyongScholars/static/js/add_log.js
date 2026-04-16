@@ -80,10 +80,27 @@ async function lockModeratorOffice(officeSelect, token) {
         
         if (response.ok) {
             const profile = await response.json();
-            if (profile.assigned_office) {
-                officeSelect.value = profile.assigned_office;
-                officeSelect.disabled = true;
-                console.log('Locked to office:', profile.assigned_office);
+            // Try both possible keys
+            const officeName = profile.office_name || profile.assigned_office;
+            
+            if (officeName) {
+                // Set the value so the submission logic still works
+                officeSelect.innerHTML = `<option value="${officeName}">${officeName}</option>`;
+                officeSelect.value = officeName;
+                
+                // Hide dropdown, show read-only UI
+                const readonlyDiv = document.getElementById('office-readonly');
+                const officeText = document.getElementById('office-text');
+                
+                if (readonlyDiv && officeText) {
+                    officeSelect.classList.add('hidden');
+                    readonlyDiv.classList.remove('hidden');
+                    officeText.textContent = officeName;
+                } else {
+                    officeSelect.disabled = true;
+                }
+                
+                console.log('Locked to office:', officeName);
             }
         }
     } catch (err) {
@@ -254,10 +271,17 @@ async function submitLog() {
 }
 
 function clearForm() {
+    const userRole = localStorage.getItem('userRole');
+    
     document.getElementById('student-id').value = '';
     document.getElementById('date-rendered').value = '';
     document.getElementById('hours').value = '';
-    document.getElementById('office').value = '';
+    
+    // Only clear office if user is NOT a moderator (Admins need to select office)
+    if (userRole !== 'MODERATOR') {
+        document.getElementById('office').value = '';
+    }
+    
     document.getElementById('activity').value = '';
     
     const preview = document.getElementById('scholar-preview');
