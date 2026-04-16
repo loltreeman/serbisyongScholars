@@ -1,12 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
     fetchVouchers('all');
+
+    if (USER_ROLE === 'SCHOLAR') {
+        fetchMyApplications();
+    }
+
+    if (CAN_MANAGE_APPLICATIONS) {
+        loadApplicationsForMod();
+    }
 });
 
 let allVouchers = [];
 
 async function fetchVouchers(category = 'all') {
     try {
-        // Build URL based on category
         let url = '/api/vouchers/';
         if (category !== 'all') {
             url += `?category=${category}`;
@@ -14,13 +21,13 @@ async function fetchVouchers(category = 'all') {
 
         const response = await fetch(url, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access')}`, // Adjust based on your auth method
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'Content-Type': 'application/json'
             }
         });
 
         if (!response.ok) throw new Error('Failed to fetch vouchers');
-        
+
         allVouchers = await response.json();
         renderVouchers(allVouchers);
     } catch (error) {
@@ -32,16 +39,6 @@ async function fetchVouchers(category = 'all') {
         `;
     }
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    fetchVouchers('all');
-    fetchMyApplications(); // For scholars
-    
-    // Admin check
-    if (localStorage.getItem('userRole') === 'ADMIN') {
-        loadAdminApplications();
-    }
-});
 
 function renderVouchers(vouchers) {
     const container = document.getElementById('vouchers-container');
@@ -56,10 +53,12 @@ function renderVouchers(vouchers) {
         return;
     }
 
+    const canApply = USER_ROLE === 'SCHOLAR';
+
     vouchers.forEach(voucher => {
         const percentageLeft = (voucher.remaining_slots / voucher.total_slots) * 100;
         let badgeColor = percentageLeft > 20 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-        
+
         const card = document.createElement('div');
         card.className = 'bg-white rounded-lg shadow-md overflow-hidden flex flex-col';
         card.innerHTML = `
@@ -72,15 +71,18 @@ function renderVouchers(vouchers) {
                 <h3 class="text-xl font-bold text-gray-900 mb-1">${voucher.title}</h3>
                 <p class="text-sm text-gray-500 mb-3">Provider: ${voucher.provider}</p>
                 <p class="text-gray-600 text-sm mb-4 line-clamp-3">${voucher.description}</p>
-                
+
                 <div class="mt-auto pt-4 border-t border-gray-100">
                     <div class="flex justify-between items-center mb-4">
                         <span class="text-xs text-gray-500">Expires: ${new Date(voucher.expiry_date).toLocaleDateString()}</span>
                     </div>
-                    <button onclick="applyForVoucher(${voucher.id})" 
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150">
-                        Apply Now
-                    </button>
+                    ${canApply
+                        ? `<button onclick="applyForVoucher(${voucher.id})"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150">
+                            Apply Now
+                          </button>`
+                        : `<div class="w-full text-center text-xs text-gray-400 py-2">Applications open to scholars only</div>`
+                    }
                 </div>
             </div>
         `;
@@ -89,7 +91,6 @@ function renderVouchers(vouchers) {
 }
 
 function filterByCategory(category) {
-    // Update active button styling
     document.querySelectorAll('.category-filter-btn').forEach(btn => {
         btn.classList.remove('bg-blue-600', 'text-white');
         btn.classList.add('bg-gray-200', 'text-gray-800');
@@ -104,7 +105,6 @@ async function applyForVoucher(voucherId) {
     if (!confirm('Are you sure you want to apply for this voucher?')) return;
 
     try {
-
         const response = await fetch(`/api/vouchers/${voucherId}/apply/`, {
             method: 'POST',
             headers: {
@@ -120,6 +120,7 @@ async function applyForVoucher(voucherId) {
         if (response.ok) {
             alert('Application submitted successfully!');
             fetchVouchers();
+            fetchMyApplications();
         } else {
             alert(data.error || 'Failed to apply for voucher');
         }
@@ -139,9 +140,8 @@ function closeCreateModal() {
 }
 
 async function submitNewVoucher(event) {
-    event.preventDefault(); // Prevent page reload
-    
-    // Gather form data
+    event.preventDefault();
+
     const voucherData = {
         title: document.getElementById('v-title').value,
         description: document.getElementById('v-desc').value,
@@ -150,20 +150,19 @@ async function submitNewVoucher(event) {
         total_slots: parseInt(document.getElementById('v-slots').value),
         expiry_date: document.getElementById('v-expiry').value,
         image_url: document.getElementById('v-image').value || null,
-        status: 'ACTIVE' 
+        status: 'ACTIVE'
     };
 
     try {
         const response = await fetch('/api/vouchers/', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access')}`, 
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken') 
+                'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify(voucherData)
         });
-
 
         if (response.ok) {
             alert('Voucher created successfully!');
@@ -180,43 +179,25 @@ async function submitNewVoucher(event) {
     }
 }
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            // Does this cookie string begin with the name we want?
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    fetchVouchers('all');
-    fetchMyApplications(); // New call
-});
-
 async function fetchMyApplications() {
+    const container = document.getElementById('my-applications-container');
+    if (!container) return;
+
     try {
         const response = await fetch('/api/vouchers/my-applications/', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'Content-Type': 'application/json'
             }
         });
 
         if (!response.ok) throw new Error('Failed to fetch applications');
-        
+
         const applications = await response.json();
         renderMyApplications(applications);
     } catch (error) {
         console.error('Error:', error);
-        document.getElementById('my-applications-container').innerHTML = 'Failed to load applications.';
+        container.innerHTML = 'Failed to load applications.';
     }
 }
 
@@ -229,15 +210,15 @@ function renderMyApplications(applications) {
         return;
     }
 
+    const statusColors = {
+        'PENDING': 'bg-yellow-100 text-yellow-800',
+        'APPROVED': 'bg-green-100 text-green-800',
+        'REJECTED': 'bg-red-100 text-red-800',
+        'CLAIMED': 'bg-blue-100 text-blue-800'
+    };
+
     let html = '<div class="space-y-4">';
     applications.forEach(app => {
-        const statusColors = {
-            'PENDING': 'bg-yellow-100 text-yellow-800',
-            'APPROVED': 'bg-green-100 text-green-800',
-            'REJECTED': 'bg-red-100 text-red-800',
-            'CLAIMED': 'bg-blue-100 text-blue-800'
-        };
-
         html += `
             <div class="border p-4 rounded-lg flex justify-between items-center">
                 <div>
@@ -246,6 +227,7 @@ function renderMyApplications(applications) {
                         ${app.voucher_category}
                     </span>
                     <p class="text-sm text-gray-500">Applied on: ${new Date(app.applied_at).toLocaleDateString()}</p>
+                    ${app.admin_notes ? `<p class="text-xs text-gray-400 mt-1">Note: ${app.admin_notes}</p>` : ''}
                 </div>
                 <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColors[app.status] || 'bg-gray-100'}">
                     ${app.status}
@@ -257,33 +239,31 @@ function renderMyApplications(applications) {
     container.innerHTML = html;
 }
 
-async function loadAdminApplications() {
+async function loadApplicationsForMod() {
     const container = document.getElementById('admin-applications-container');
     if (!container) return;
 
     try {
         const response = await fetch('/api/vouchers/applications/', {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'Content-Type': 'application/json'
             }
         });
 
         if (!response.ok) throw new Error('Failed to fetch applications');
-        
+
         const apps = await response.json();
-        // Show only the voucher applications that need approvals
         const pending = apps.filter(app => app.status === 'PENDING');
-        
-        renderAdminApplications(pending);
+        renderApplications(pending);
     } catch (error) {
         console.error('Error:', error);
     }
 }
 
-function renderAdminApplications(apps) {
+function renderApplications(apps) {
     const container = document.getElementById('admin-applications-container');
-    
+
     if (apps.length === 0) {
         container.innerHTML = '<p class="text-gray-500 text-center py-4">No pending applications to review.</p>';
         return;
@@ -296,19 +276,22 @@ function renderAdminApplications(apps) {
                     <h4 class="font-bold text-gray-900">${app.voucher_title}</h4>
                     <span class="text-xs font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded uppercase">
                         ${app.voucher_category}
-                    </span>    
+                    </span>
                 </div>
                 <p class="text-sm font-medium text-gray-700">Student: ${app.scholar_name} (${app.scholar_id})</p>
             </div>
             <div class="flex flex-col gap-2">
-                <button onclick="handleApplicationAction(${app.id}, 'approve')" 
-                        class="px-4 py-1.5 bg-green-600 text-white text-xs font-bold rounded hover:bg-green-700 transition">
-                    APPROVE
-                </button>
-                <button onclick="handleApplicationAction(${app.id}, 'reject')" 
-                        class="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition">
-                    REJECT
-                </button>
+                ${IS_READONLY_MOD
+                    ? `<span class="text-xs text-gray-400 italic">View only</span>`
+                    : `<button onclick="handleApplicationAction(${app.id}, 'approve')"
+                              class="px-4 py-1.5 bg-green-600 text-white text-xs font-bold rounded hover:bg-green-700 transition">
+                          APPROVE
+                       </button>
+                       <button onclick="handleApplicationAction(${app.id}, 'reject')"
+                              class="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 transition">
+                          REJECT
+                       </button>`
+                }
             </div>
         </div>
     `).join('');
@@ -316,13 +299,13 @@ function renderAdminApplications(apps) {
 
 async function handleApplicationAction(applicationId, action) {
     let notes = '';
-    
+
     if (action === 'approve') {
         if (!confirm('Approve this voucher application?')) return;
-        notes = 'Approved by Admin';
+        notes = 'Approved';
     } else {
         notes = prompt('Reason for rejection (optional):');
-        if (notes === null) return; // User cancelled prompt
+        if (notes === null) return;
     }
 
     try {
@@ -330,19 +313,18 @@ async function handleApplicationAction(applicationId, action) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ 
-                action: action, 
+            body: JSON.stringify({
+                action: action,
                 admin_notes: notes || 'No additional notes'
             })
         });
 
         if (response.ok) {
             showSuccessToast(`Application ${action}d successfully`);
-            
-            loadAdminApplications();
+            loadApplicationsForMod();
             fetchVouchers('all');
         } else {
             const data = await response.json();
@@ -368,5 +350,20 @@ function showSuccessToast(message) {
     setTimeout(() => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
-    }, 300);
+    }, 3000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }

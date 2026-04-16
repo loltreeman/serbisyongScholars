@@ -29,6 +29,8 @@ form.addEventListener("submit", async (e) => {
         const userRole = data.user ? data.user.role : null;
         localStorage.setItem("userRole", userRole);
         localStorage.setItem("loggedInUsername", data.user.username);
+        localStorage.setItem("officeName", data.user.office_name || "");
+        localStorage.setItem("isOaaMod", data.user.is_oaa_mod ? "true" : "false");
 
         console.log("LOGIN SUCCESS. ROLE:", userRole);
 

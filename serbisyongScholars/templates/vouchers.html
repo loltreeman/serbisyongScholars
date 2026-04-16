@@ -19,14 +19,14 @@
                 <p class="text-gray-600 mt-2">Sign up for food stubs, tickets, and other rewards</p>
             </div>
             
-            {% if request.user.role == 'ADMIN' %}
+            {% if can_create_voucher %}
             <button onclick="openCreateModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-150">
                 + Create Voucher
             </button>
             {% endif %}
         </div>
 
-        {% if request.user.role == 'ADMIN' %}
+        {% if can_create_voucher %}
         <div id="create-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
                 <div class="flex justify-between items-center mb-6">
@@ -126,11 +126,14 @@
         </div>
         {% endif %}
 
-        {% if request.user.role == 'ADMIN' %}
+        {% if can_manage_applications %}
         <div id="admin-voucher-section" class="mb-12">
             <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                Pending Applications
+                {% if is_readonly_mod %}Applications for Your Office's Vouchers{% else %}Pending Applications{% endif %}
             </h2>
+            {% if is_readonly_mod %}
+            <p class="text-sm text-gray-500 mb-4">You can view these applications but cannot approve or reject them. Please coordinate with the OAA office or an admin to process them.</p>
+            {% endif %}
             <div id="admin-applications-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <p class="text-gray-500 italic">Checking for pending reviews...</p>
             </div>
@@ -140,7 +143,13 @@
 
         <div id="vouchers-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             </div>
-        
-    </div> <script src="{% static 'js/vouchers.js' %}"></script>
+
+    </div>
+    <script>
+        const USER_ROLE = "{{ request.user.role }}";
+        const CAN_MANAGE_APPLICATIONS = {{ can_manage_applications|yesno:"true,false" }};
+        const IS_READONLY_MOD = {{ is_readonly_mod|yesno:"true,false" }};
+    </script>
+    <script src="{% static 'js/vouchers.js' %}"></script>
 </body>
 </html>

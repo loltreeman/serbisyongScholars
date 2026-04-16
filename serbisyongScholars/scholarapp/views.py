@@ -164,6 +164,17 @@ def verify_email(request):
     else:
         return Response({'error': 'Invalid or expired verification link.'}, status=status.HTTP_400_BAD_REQUEST)
     
+def is_oaa_mod(user):
+    """Returns True if the user is a moderator for the OAA office."""
+    if user.role != 'MODERATOR':
+        return False
+    try:
+        office = user.moderator_profile.office_name.lower()
+        return 'oaa' in office or 'admission and aid' in office
+    except Exception:
+        return False
+
+
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         # Handle Email login by finding the actual username
@@ -178,11 +189,19 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Standard JWT validation
         data = super().validate(attrs)
 
+        office_name = None
+        try:
+            office_name = self.user.moderator_profile.office_name
+        except Exception:
+            pass
+
         # Add user info for the frontend
         data['user'] = {
             'username': self.user.username,
             'email': self.user.email,
             'role': self.user.role,
+            'office_name': office_name,
+            'is_oaa_mod': is_oaa_mod(self.user),
         }
         return data
 
@@ -958,9 +977,9 @@ def vouchers_list(request):
         return Response(serializer.data)
     
     elif request.method == 'POST':
-        # Only ADMIN can create vouchers
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin only'}, status=403)
+        # Only ADMIN or OAA moderators can create vouchers
+        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
+            return Response({'error': 'Only OAA moderators and admins can create vouchers'}, status=403)
         
         serializer = VoucherSerializer(data=request.data)
         if serializer.is_valid():
@@ -992,18 +1011,18 @@ def voucher_detail(request, voucher_id):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin only'}, status=403)
-        
+        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
+            return Response({'error': 'Only OAA moderators and admins can edit vouchers'}, status=403)
+
         serializer = VoucherSerializer(voucher, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
-    
+
     elif request.method == 'DELETE':
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin only'}, status=403)
+        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
+            return Response({'error': 'Only OAA moderators and admins can delete vouchers'}, status=403)
         
         voucher.delete()
         return Response({'message': 'Voucher deleted successfully'}, status=200)
@@ -1077,23 +1096,37 @@ def my_voucher_applications(request):
 @permission_classes([IsAuthenticated])
 def voucher_applications_list(request):
     """
-    Admin view: Get all voucher applications
+    List voucher applications.
+    - Admin / OAA mod: see all applications.
+    - Other mods: see only applications for vouchers they created or
+      whose provider matches their office name.
     """
-    if request.user.role != 'ADMIN':
-        return Response({'error': 'Admin only'}, status=403)
-    
-    applications = VoucherApplication.objects.all()
-    
+    user = request.user
+
+    if user.role == 'ADMIN' or is_oaa_mod(user):
+        applications = VoucherApplication.objects.all()
+    elif user.role == 'MODERATOR':
+        try:
+            office = user.moderator_profile.office_name
+            applications = VoucherApplication.objects.filter(
+                Q(voucher__created_by=user) |
+                Q(voucher__provider__icontains=office)
+            )
+        except Exception:
+            applications = VoucherApplication.objects.none()
+    else:
+        return Response({'error': 'Moderator or Admin access required'}, status=403)
+
     # Filter by status
-    status = request.GET.get('status')
-    if status:
-        applications = applications.filter(status=status)
-    
+    filter_status = request.GET.get('status')
+    if filter_status:
+        applications = applications.filter(status=filter_status)
+
     # Filter by voucher
     voucher_id = request.GET.get('voucher_id')
     if voucher_id:
         applications = applications.filter(voucher_id=voucher_id)
-    
+
     serializer = VoucherApplicationSerializer(applications, many=True)
     return Response(serializer.data)
 
@@ -1102,15 +1135,22 @@ def voucher_applications_list(request):
 @permission_classes([IsAuthenticated])
 def approve_voucher_application(request, application_id):
     """
-    Admin approves or rejects a voucher application
+    Approve or reject a voucher application.
+    Allowed: Admin, OAA moderators, or the moderator who created the voucher.
     """
-    if request.user.role != 'ADMIN':
-        return Response({'error': 'Admin only'}, status=403)
-    
     try:
         application = VoucherApplication.objects.get(id=application_id)
     except VoucherApplication.DoesNotExist:
         return Response({'error': 'Application not found'}, status=404)
+
+    user = request.user
+    can_approve = (
+        user.role == 'ADMIN' or
+        is_oaa_mod(user) or
+        (user.role == 'MODERATOR' and application.voucher.created_by == user)
+    )
+    if not can_approve:
+        return Response({'error': 'Not authorized to approve applications for this voucher'}, status=403)
     
     action = request.data.get('action')  # 'approve' or 'reject'
     admin_notes = request.data.get('admin_notes', '')
@@ -1140,7 +1180,19 @@ def approve_voucher_application(request, application_id):
     
 @login_required
 def vouchers_page(request):
-    return render(request, 'vouchers.html')
+    user = request.user
+    can_create = user.role == 'ADMIN' or is_oaa_mod(user)
+    can_manage = user.role in ('ADMIN', 'MODERATOR')
+
+    # Non-OAA mods can see applications for their office but not approve them
+    is_readonly_mod = user.role == 'MODERATOR' and not is_oaa_mod(user)
+
+    return render(request, 'vouchers.html', {
+        'can_create_voucher': can_create,
+        'can_manage_applications': can_manage,
+        'is_oaa_mod': is_oaa_mod(user),
+        'is_readonly_mod': is_readonly_mod,
+    })
 
 
 @api_view(['GET', 'POST'])
