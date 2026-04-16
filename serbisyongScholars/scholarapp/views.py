@@ -1059,8 +1059,8 @@ def vouchers_list(request):
 def voucher_detail(request, voucher_id):
     """
     GET: Get voucher details
-    PUT: Update voucher (ADMIN only)
-    DELETE: Delete voucher (ADMIN only)
+    PUT: Update voucher
+    DELETE: Delete voucher
     """
     reconcile_expired_voucher_state()
 
@@ -1069,26 +1069,91 @@ def voucher_detail(request, voucher_id):
     except Voucher.DoesNotExist:
         return Response({'error': 'Voucher not found'}, status=404)
     
+    user = request.user
+    role = get_effective_role(user)
+
     if request.method == 'GET':
         serializer = VoucherSerializer(voucher)
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Only admins can edit vouchers'}, status=403)
+        # Admin can edit always; creator (mod) can edit if 0 approved apps
+        if role == 'ADMIN':
+            pass
+        elif role == 'MODERATOR' and voucher.created_by == user:
+            approved_count = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').count()
+            if approved_count > 0:
+                return Response({'error': 'You cannot edit a voucher that already has approved applications. Please contact an admin.'}, status=403)
+        else:
+            return Response({'error': 'Unauthorized to edit this voucher'}, status=403)
+
+        force = request.data.get('force') == True
+        new_total_slots = request.data.get('total_slots')
+
+        if new_total_slots is not None:
+            new_total_slots = int(new_total_slots)
+            approved_count = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').count()
+            
+            if new_total_slots < approved_count:
+                if not force:
+                    return Response({
+                        'error': f'Reducing slots to {new_total_slots} will require rejecting {approved_count - new_total_slots} already approved applications.',
+                        'requires_confirmation': True,
+                        'conflict_type': 'SLOT_REDUCTION',
+                        'approved_count': approved_count
+                    }, status=409)
+                else:
+                    # Auto-reject excess approved (oldest first)
+                    excess = approved_count - new_total_slots
+                    to_reject = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').order_by('applied_at')[:excess]
+                    count = 0
+                    for app in to_reject:
+                        app.status = 'REJECTED'
+                        app.admin_notes = 'Auto-rejected due to voucher slot reduction.'
+                        app.save()
+                        count += 1
+                    
+                    # Update remaining slots logic: total_slots - approved - pending
+                    # But simpler: we just set total_slots, and in the next step serializer.save() will handle it.
+                    # Wait, the serializer.save() might not update remaining_slots automatically if it's not custom logic.
+                    # Actually, we should recalculate remaining_slots.
+                    pass
 
         serializer = VoucherSerializer(voucher, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            # If total_slots changed, we MUST update remaining_slots
+            if 'total_slots' in serializer.validated_data:
+                old_total = voucher.total_slots
+                new_total = serializer.validated_data['total_slots']
+                diff = new_total - old_total
+                # Note: this ignores pending apps for simplicity, matching the existing apply logic 
+                # where remaining_slots = total_slots - (all applications created).
+                # Wait, the current apply logic decrements on creation. So:
+                # new_remaining = current_remaining + diff
+                serializer.save(remaining_slots=max(0, voucher.remaining_slots + diff))
+            else:
+                serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
 
     elif request.method == 'DELETE':
-        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
+        if not (role == 'ADMIN' or is_oaa_mod(user)):
             return Response({'error': 'Only OAA moderators and admins can delete vouchers'}, status=403)
         
+        force = request.query_params.get('force') == 'true'
+        pending_count = VoucherApplication.objects.filter(voucher=voucher, status='PENDING').count()
+        approved_count = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').count()
+
+        if (pending_count > 0 or approved_count > 0) and not force:
+            return Response({
+                'error': f'This voucher has {pending_count} pending and {approved_count} approved applications.',
+                'requires_confirmation': True,
+                'pending_count': pending_count,
+                'approved_count': approved_count
+            }, status=409)
+            
         voucher.delete()
-        return Response({'message': 'Voucher deleted successfully'}, status=200)
+        return Response({'message': 'Voucher and all linked applications deleted successfully'}, status=200)
 
 
 @api_view(['POST'])
@@ -1263,6 +1328,7 @@ def vouchers_page(request):
         'can_manage_applications': can_manage,
         'is_oaa_mod': is_oaa_mod(user),
         'is_readonly_mod': is_readonly_mod,
+        'current_username': user.username,
     })
 
 

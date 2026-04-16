@@ -187,6 +187,8 @@ class VoucherApplicationSerializer(serializers.ModelSerializer):
     voucher_title = serializers.CharField(source='voucher.title', read_only=True)
     voucher_category = serializers.CharField(source='voucher.category', read_only=True)
     voucher_expiry_date = serializers.DateField(source='voucher.expiry_date', read_only=True)
+    voucher_created_by_name = serializers.CharField(source='voucher.created_by.get_full_name', read_only=True)
+    voucher_created_by_username = serializers.CharField(source='voucher.created_by.username', read_only=True)
     scholar_name = serializers.CharField(source='scholar.get_full_name', read_only=True)
     scholar_id = serializers.CharField(source='scholar.scholar_profile.student_id', read_only=True)
 
@@ -194,6 +196,7 @@ class VoucherApplicationSerializer(serializers.ModelSerializer):
         model = VoucherApplication
         fields = [
             'id', 'voucher', 'voucher_title', 'voucher_category', 'voucher_expiry_date',
+            'voucher_created_by_name', 'voucher_created_by_username',
             'scholar', 'scholar_name', 'scholar_id', 'applied_at', 'status', 'notes', 'admin_notes'
         ]
         read_only_fields = ['scholar', 'applied_at', 'status']
