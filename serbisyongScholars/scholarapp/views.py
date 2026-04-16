@@ -924,6 +924,7 @@ def approve_announcement(request, announcement_id):
     else:
         return Response({'error': 'Invalid action'}, status=400)
   
+@login_required(login_url='/login/')
 def announcements_page(request):
     """Render announcements page"""
     return render(request, 'announcements.html', {

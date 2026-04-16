@@ -27,8 +27,8 @@ async function fetchVouchers(category = 'all') {
         if (params.toString()) url += `?${params.toString()}`;
 
         const response = await fetch(url, {
+            credentials: 'same-origin',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'Content-Type': 'application/json'
             }
         });

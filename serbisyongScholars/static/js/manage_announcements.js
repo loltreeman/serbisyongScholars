@@ -4,9 +4,7 @@ let currentStatus = 'PENDING';
 async function loadAnnouncements() {
     try {
         const response = await fetch('/api/announcements/', {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access')}`
-            }
+            credentials: 'same-origin'
         });
         
         allAnnouncements = await response.json();
@@ -29,6 +27,13 @@ function filterByStatus(status) {
     });
     
     let filtered = allAnnouncements.filter(a => a.status === status);
+
+    // If moderator, only show their own announcements
+    const userRole = localStorage.getItem('userRole');
+    const currentUser = localStorage.getItem('loggedInUsername') || '';
+    if (userRole === 'MODERATOR') {
+        filtered = filtered.filter(a => a.author_username && a.author_username.toLowerCase() === currentUser.toLowerCase());
+    }
 
     // Apply search filter
     const searchTerm = document.getElementById('search-manage-announcements')?.value.toLowerCase().trim();
@@ -91,9 +96,9 @@ async function approveAnnouncement(id) {
         const response = await fetch(`/api/announcements/${id}/approve/`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',
             body: JSON.stringify({ action: 'approve' })
         });
         
@@ -114,9 +119,9 @@ async function rejectAnnouncement(id) {
         const response = await fetch(`/api/announcements/${id}/approve/`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',
             body: JSON.stringify({ 
                 action: 'reject',
                 rejection_reason: reason || ''
@@ -135,6 +140,12 @@ async function rejectAnnouncement(id) {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAnnouncements();
+    
+    const userRole = localStorage.getItem('userRole');
+    if (userRole === 'MODERATOR') {
+        const titleEl = document.getElementById('page-title');
+        if (titleEl) titleEl.textContent = 'My Announcements';
+    }
     
     const searchInput = document.getElementById('search-manage-announcements');
     if (searchInput) {

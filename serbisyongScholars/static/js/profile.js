@@ -34,9 +34,7 @@ async function loadProfile() {
         }
 
         const res = await fetch(apiUrl, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access')}`
-            }
+            credentials: 'same-origin'
         });
 
         if (!res.ok) {
@@ -96,7 +94,6 @@ async function toggleDormer(studentId, currentStatus) {
             credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': getCookie('csrftoken') || ''
             },
             body: JSON.stringify({
@@ -428,9 +425,9 @@ async function handleSave() {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': getCookie('csrftoken') || ''
             },
+            credentials: 'same-origin',
             body: JSON.stringify(payload)
         });
 

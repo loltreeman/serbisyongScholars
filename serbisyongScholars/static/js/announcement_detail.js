@@ -53,9 +53,9 @@ async function deleteAnnouncement(id) {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
+            credentials: 'same-origin',
             body: JSON.stringify({ id: parseInt(id) })
         });
         
@@ -95,9 +95,9 @@ async function handleEditSubmit(event) {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
+            credentials: 'same-origin',
             body: JSON.stringify(data)
         });
         
@@ -111,15 +111,71 @@ async function handleEditSubmit(event) {
             alert('Failed to update: ' + (errorData.error || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error updating announcement:', error);
         alert('Error updating announcement: ' + error.message);
     }
 }
 
+async function approveAnnouncement(id) {
+    if (!confirm('Approve this announcement?')) return;
+    try {
+        const csrftoken = getCookie('csrftoken');
+        const response = await fetch(`/api/announcements/${id}/approve/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ action: 'approve' })
+        });
+        if (response.ok) {
+            showSuccessToast('Announcement approved!');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Failed to approve: ' + (error.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error approving announcement');
+    }
+}
+
+async function rejectAnnouncement(id) {
+    const reason = prompt('Please provide a rejection reason (optional):');
+    if (reason === null) return;
+    try {
+        const csrftoken = getCookie('csrftoken');
+        const response = await fetch(`/api/announcements/${id}/approve/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ 
+                action: 'reject',
+                rejection_reason: reason || 'No reason provided'
+            })
+        });
+        if (response.ok) {
+            showSuccessToast('Announcement rejected');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            const error = await response.json();
+            alert('Failed to reject: ' + (error.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error rejecting announcement');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    const editBtn = document.getElementById('editBtn');
-    const deleteBtn = document.getElementById('deleteBtn');
     const editForm = document.getElementById('edit-form');
+    const approveBtn = document.getElementById('approveBtn');
+    const rejectBtn = document.getElementById('rejectBtn');
 
     if (editBtn) {
         editBtn.addEventListener('click', () => {
@@ -132,6 +188,20 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteBtn.addEventListener('click', () => {
             const id = deleteBtn.getAttribute('data-id');
             deleteAnnouncement(id);
+        });
+    }
+
+    if (approveBtn) {
+        approveBtn.addEventListener('click', () => {
+            const id = approveBtn.getAttribute('data-id');
+            approveAnnouncement(id);
+        });
+    }
+
+    if (rejectBtn) {
+        rejectBtn.addEventListener('click', () => {
+            const id = rejectBtn.getAttribute('data-id');
+            rejectAnnouncement(id);
         });
     }
     
