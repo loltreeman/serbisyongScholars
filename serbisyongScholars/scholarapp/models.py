@@ -31,14 +31,8 @@ class User(AbstractUser):
 
     @property
     def effective_role(self):
-        if self.role in ('ADMIN', 'MODERATOR'):
-            return self.role
-
-        try:
-            self.moderator_profile
-            return 'MODERATOR'
-        except ObjectDoesNotExist:
-            return self.role
+        # role is the single source of truth — no profile fallback
+        return self.role
 
     @property
     def assigned_office(self):
