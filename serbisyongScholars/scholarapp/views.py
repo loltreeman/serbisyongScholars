@@ -1,3 +1,4 @@
+# pyright: reportAttributeAccessIssue=false, reportGeneralTypeIssues=false, reportOptionalMemberAccess=false, reportArgumentType=false, reportIndexIssue=false, reportOperatorIssue=false
 import threading
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
@@ -250,7 +251,7 @@ class MyTokenObtainPairView(TokenObtainPairView):
         if login_id and '@' in login_id:
             try:
                 user_obj = User.objects.get(email__iexact=login_id)
-                request.data['username'] = user_obj.username
+                request.data['username'] = user_obj.username  # type: ignore
             except User.DoesNotExist:
                 pass
 
@@ -1188,7 +1189,7 @@ def voucher_detail(request, voucher_id):
             # If total_slots changed, we MUST update remaining_slots
             if 'total_slots' in serializer.validated_data:
                 old_total = voucher.total_slots
-                new_total = serializer.validated_data['total_slots']
+                new_total = serializer.validated_data['total_slots']  # type: ignore
                 diff = new_total - old_total
                 # Note: this ignores pending apps for simplicity, matching the existing apply logic 
                 # where remaining_slots = total_slots - (all applications created).
