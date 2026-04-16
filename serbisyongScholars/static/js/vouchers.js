@@ -372,7 +372,7 @@ async function loadApplicationsForMod() {
 function renderPendingApplications(apps) {
     const container = document.getElementById('admin-applications-container');
     if (apps.length === 0) {
-        container.innerHTML = '<div class="col-span-full py-8 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-gray-400"><span class="text-3xl mb-2">☕</span><p>All caught up! No pending reviews.</p></div>';
+        container.innerHTML = '<div class="col-span-full py-8 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-gray-400"><p>All caught up! No pending reviews.</p></div>';
         return;
     }
 
