@@ -1,55 +1,64 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vouchers - serbisyongScholar</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-50">
-    
+
     {% include 'partials/navbar.html' %}
-    
+
     <div class="max-w-7xl mx-auto px-4 py-8">
-        
+
         <div class="mb-8 flex justify-between items-center">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900">Available Vouchers & Rewards</h1>
                 <p class="text-gray-600 mt-2">Sign up for food stubs, tickets, and other rewards</p>
             </div>
-            
+
             {% if can_create_voucher %}
-            <button onclick="openCreateModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-150">
+            <button onclick="openCreateModal()"
+                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-150">
                 + Create Voucher
             </button>
             {% endif %}
         </div>
 
         <!-- Create/Edit Modal -->
-        <div id="voucher-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div id="voucher-modal"
+            class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
                 <div class="flex justify-between items-center mb-6">
                     <h2 id="modal-title" class="text-2xl font-bold">Create New Voucher</h2>
-                    <button onclick="closeVoucherModal()" class="text-gray-500 hover:text-gray-700 font-bold text-xl">&times;</button>
+                    <button onclick="closeVoucherModal()"
+                        class="text-gray-500 hover:text-gray-700 font-bold text-xl">&times;</button>
                 </div>
-                
+
                 <form id="voucher-form" onsubmit="handleVoucherSubmit(event)">
                     <input type="hidden" id="v-id">
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700">Title</label>
-                        <input type="text" id="v-title" required class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                        <input type="text" id="v-title" required
+                            class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
-                    
+
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700">Description</label>
-                        <textarea id="v-desc" required class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" rows="3"></textarea>
+                        <textarea id="v-desc" required
+                            class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+                            rows="3"></textarea>
                     </div>
-                    
+
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Category</label>
-                            <select id="v-category" required class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <select id="v-category" required
+                                class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="FOODSTUB">Food Stub</option>
                                 <option value="ENTERTAINMENT">Entertainment</option>
                                 <option value="TRANSPORT">Transport</option>
@@ -59,27 +68,32 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Total Slots</label>
-                            <input type="number" id="v-slots" min="1" required class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <input type="number" id="v-slots" min="1" required
+                                class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Provider</label>
-                            <input type="text" id="v-provider" required placeholder="e.g., Kitchen City" class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <input type="text" id="v-provider" required placeholder="e.g., Kitchen City"
+                                class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Expiry Date</label>
-                            <input type="date" id="v-expiry" min="{% now 'Y-m-d' %}" required class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                            <input type="date" id="v-expiry" min="{% now 'Y-m-d' %}" required
+                                class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
                     </div>
 
                     <div class="mb-6">
                         <label class="block text-sm font-medium text-gray-700">Image URL (Optional)</label>
-                        <input type="url" id="v-image" class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                        <input type="url" id="v-image"
+                            class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
-                    
-                    <button type="submit" id="save-voucher-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg shadow transition">
+
+                    <button type="submit" id="save-voucher-btn"
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg shadow transition">
                         Save Voucher
                     </button>
                 </form>
@@ -87,15 +101,18 @@
         </div>
 
         <!-- Delete Confirmation Modal -->
-        <div id="delete-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-[60]">
+        <div id="delete-confirm-modal"
+            class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-[60]">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
                 <h2 class="text-2xl font-bold text-red-600 mb-4">Confirm Deletion</h2>
                 <div id="delete-warning-text" class="text-gray-700 mb-6"></div>
                 <div class="flex gap-4">
-                    <button onclick="closeDeleteModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition">
+                    <button onclick="closeDeleteModal()"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition">
                         Cancel
                     </button>
-                    <button id="force-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow transition">
+                    <button id="force-delete-btn"
+                        class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow transition">
                         Delete anyway
                     </button>
                 </div>
@@ -103,50 +120,53 @@
         </div>
 
         <!-- Slot Reduction Modal -->
-        <div id="slot-warn-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-[60]">
+        <div id="slot-warn-modal"
+            class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-[60]">
             <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
                 <h2 class="text-2xl font-bold text-yellow-600 mb-4">Confirm Slot Reduction</h2>
                 <div id="slot-warning-text" class="text-gray-700 mb-6"></div>
                 <div class="flex gap-4">
-                    <button onclick="closeSlotWarnModal()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition">
+                    <button onclick="closeSlotWarnModal()"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow transition">
                         Cancel
                     </button>
-                    <button id="force-update-btn" class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow transition">
+                    <button id="force-update-btn"
+                        class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow transition">
                         Reduce and Reject
                     </button>
                 </div>
             </div>
         </div>
-        
+
         <div class="bg-white rounded-lg shadow mb-6 p-4">
             <div class="flex gap-2 overflow-x-auto">
-                <button onclick="filterByCategory('all', event)" 
-                        class="category-filter-btn active px-4 py-2 rounded-lg bg-blue-600 text-white font-medium">
+                <button onclick="filterByCategory('all', event)"
+                    class="category-filter-btn active px-4 py-2 rounded-lg bg-blue-600 text-white font-medium">
                     All
                 </button>
-                <button onclick="filterByCategory('FOODSTUB', event)" 
-                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                <button onclick="filterByCategory('FOODSTUB', event)"
+                    class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
                     Food Stubs
                 </button>
-                <button onclick="filterByCategory('ENTERTAINMENT', event)" 
-                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                <button onclick="filterByCategory('ENTERTAINMENT', event)"
+                    class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
                     Entertainment
                 </button>
-                <button onclick="filterByCategory('TRANSPORT', event)" 
-                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                <button onclick="filterByCategory('TRANSPORT', event)"
+                    class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
                     Transport
                 </button>
-                <button onclick="filterByCategory('WELLNESS', event)" 
-                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                <button onclick="filterByCategory('WELLNESS', event)"
+                    class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
                     Wellness
                 </button>
-                <button onclick="filterByCategory('ACADEMIC', event)" 
-                        class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
+                <button onclick="filterByCategory('ACADEMIC', event)"
+                    class="category-filter-btn px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 font-medium">
                     Academic
                 </button>
             </div>
         </div>
-        
+
         <div id="vouchers-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         </div>
 
@@ -156,10 +176,10 @@
             <div id="voucher-submissions-section" class="bg-white rounded-lg shadow p-6">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <h2 class="text-xl font-bold text-gray-800">Voucher Submissions and History</h2>
-                    
+
                     <div class="flex flex-wrap gap-2 text-sm">
-                        <input type="text" id="v-sub-search" placeholder="Search title or provider..." 
-                               class="border rounded px-2 py-1 w-full md:w-auto" onkeyup="applyVoucherSubFilters()">
+                        <input type="text" id="v-sub-search" placeholder="Search title or provider..."
+                            class="border rounded px-2 py-1 w-full md:w-auto" onkeyup="applyVoucherSubFilters()">
                         <select id="v-sub-status" class="border rounded px-2 py-1" onchange="loadVoucherSubmissions()">
                             <option value="all">All statuses</option>
                             <option value="PENDING">Pending Approval</option>
@@ -173,11 +193,14 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher Title</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher
+                                    Title</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creator</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Submitted</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions / Notes</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date
+                                    Submitted</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions /
+                                    Notes</th>
                             </tr>
                         </thead>
                         <tbody id="voucher-sub-table-body" class="bg-white divide-y divide-gray-200 text-sm">
@@ -200,10 +223,10 @@
             <!-- SECTION 3: Application History (Scholar Results) -->
             <div id="history-section" class="bg-white rounded-lg shadow p-6">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <h2 class="text-xl font-bold text-gray-800">Scholar History (Resolved)</h2>
+                    <h2 class="text-xl font-bold text-gray-800">Scholar Voucher History</h2>
                     <div class="flex flex-wrap gap-2 text-sm">
-                        <input type="text" id="hist-search" placeholder="Search scholar..." 
-                               class="border rounded px-2 py-1 w-full md:w-auto" onkeyup="applyHistoryFilters()">
+                        <input type="text" id="hist-search" placeholder="Search scholar..."
+                            class="border rounded px-2 py-1 w-full md:w-auto" onkeyup="applyHistoryFilters()">
                         <select id="hist-status" class="border rounded px-2 py-1" onchange="applyHistoryFilters()">
                             <option value="all">All statuses</option>
                             <option value="APPROVED">Approved</option>
@@ -220,7 +243,8 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scholar</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Admin Notes</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Admin Notes
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="history-table-body" class="bg-white divide-y divide-gray-200 text-sm">
@@ -234,7 +258,8 @@
             <div id="my-applications-section" class="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">My Applications & History</h2>
-                    <select id="my-history-status" onchange="loadMyApplications()" class="text-sm border-gray-300 rounded p-1">
+                    <select id="my-history-status" onchange="loadMyApplications()"
+                        class="text-sm border-gray-300 rounded p-1">
                         <option value="all">All statuses</option>
                         <option value="PENDING">Pending</option>
                         <option value="APPROVED">Approved</option>
@@ -259,4 +284,5 @@
     </script>
     <script src="{% static 'js/vouchers.js' %}"></script>
 </body>
-</html>
+
+</html>
