@@ -154,7 +154,7 @@ function createAnnouncementCard(announcement) {
     let showActions = false;
     if (userRole === 'ADMIN') {
         showActions = true;
-    } else if (userRole === 'MODERATOR' && announcement.author_username && announcement.author_username.toLowerCase() === currentUser.toLowerCase() && announcement.status === 'PENDING') {
+    } else if (userRole === 'MODERATOR' && announcement.author_username && announcement.author_username.toLowerCase() === currentUser.toLowerCase() && (announcement.status === 'PENDING' || announcement.status === 'REJECTED')) {
         showActions = true;
     }
     
