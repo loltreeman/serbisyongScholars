@@ -69,7 +69,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Expiry Date</label>
-                            <input type="date" id="v-expiry" required class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                            <input type="date" id="v-expiry" min="{% now 'Y-m-d' %}" required class="mt-1 w-full border border-gray-300 rounded-md p-2">
                         </div>
                     </div>
 

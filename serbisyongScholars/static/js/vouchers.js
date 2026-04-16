@@ -142,13 +142,23 @@ function closeCreateModal() {
 async function submitNewVoucher(event) {
     event.preventDefault();
 
+    const expiryDate = document.getElementById('v-expiry').value;
+    const selectedDate = new Date(`${expiryDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDate < today) {
+        alert('Expiry date cannot be yesterday or in the past.');
+        return;
+    }
+
     const voucherData = {
         title: document.getElementById('v-title').value,
         description: document.getElementById('v-desc').value,
         category: document.getElementById('v-category').value,
         provider: document.getElementById('v-provider').value,
         total_slots: parseInt(document.getElementById('v-slots').value),
-        expiry_date: document.getElementById('v-expiry').value,
+        expiry_date: expiryDate,
         image_url: document.getElementById('v-image').value || null,
         status: 'ACTIVE'
     };
@@ -171,7 +181,13 @@ async function submitNewVoucher(event) {
         } else {
             const data = await response.json();
             console.error('Validation errors:', data);
-            alert('Failed to create voucher. Check console for details.');
+            if (data.expiry_date && data.expiry_date.length) {
+                alert(data.expiry_date[0]);
+            } else if (data.error) {
+                alert(data.error);
+            } else {
+                alert('Failed to create voucher. Check console for details.');
+            }
         }
     } catch (error) {
         console.error('Error:', error);

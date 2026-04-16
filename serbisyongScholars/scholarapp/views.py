@@ -187,6 +187,32 @@ def is_oaa_mod(user):
     return 'oaa' in office or 'admission and aid' in office
 
 
+def reconcile_expired_voucher_state():
+    """Expire vouchers and auto-decline pending applications for expired vouchers."""
+    today = date.today()
+
+    Voucher.objects.filter(expiry_date__lt=today).exclude(status='EXPIRED').update(status='EXPIRED')
+
+    pending_apps = VoucherApplication.objects.select_related('voucher').filter(
+        status='PENDING',
+        voucher__expiry_date__lt=today,
+    )
+
+    restored_slots = {}
+    for application in pending_apps:
+        application.status = 'REJECTED'
+        application.admin_notes = 'Auto-declined because the voucher expired.'
+        application.save(update_fields=['status', 'admin_notes'])
+
+        restored_slots[application.voucher_id] = restored_slots.get(application.voucher_id, 0) + 1
+
+    for voucher_id, restore_count in restored_slots.items():
+        voucher = Voucher.objects.get(id=voucher_id)
+        voucher.remaining_slots = min(voucher.total_slots, voucher.remaining_slots + restore_count)
+        voucher.status = 'EXPIRED'
+        voucher.save(update_fields=['remaining_slots', 'status'])
+
+
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         # Handle Email login by finding the actual username
@@ -989,6 +1015,8 @@ def vouchers_list(request):
     GET: List all active vouchers
     POST: Create voucher (ADMIN only)
     """
+    reconcile_expired_voucher_state()
+
     if request.method == 'GET':
         # Scholars see only active, available vouchers
         # Admins see all vouchers
@@ -1034,6 +1062,8 @@ def voucher_detail(request, voucher_id):
     PUT: Update voucher (ADMIN only)
     DELETE: Delete voucher (ADMIN only)
     """
+    reconcile_expired_voucher_state()
+
     try:
         voucher = Voucher.objects.get(id=voucher_id)
     except Voucher.DoesNotExist:
@@ -1044,8 +1074,8 @@ def voucher_detail(request, voucher_id):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
-            return Response({'error': 'Only OAA moderators and admins can edit vouchers'}, status=403)
+        if request.user.role != 'ADMIN':
+            return Response({'error': 'Only admins can edit vouchers'}, status=403)
 
         serializer = VoucherSerializer(voucher, data=request.data, partial=True)
         if serializer.is_valid():
@@ -1067,6 +1097,8 @@ def apply_voucher(request, voucher_id):
     """
     Scholar applies for a voucher
     """
+    reconcile_expired_voucher_state()
+
     if request.user.role != 'SCHOLAR':
         return Response({'error': 'Only scholars can apply for vouchers'}, status=403)
     
@@ -1117,6 +1149,8 @@ def my_voucher_applications(request):
     """
     Get current scholar's voucher applications
     """
+    reconcile_expired_voucher_state()
+
     if request.user.role != 'SCHOLAR':
         return Response({'error': 'Scholars only'}, status=403)
     
@@ -1134,6 +1168,8 @@ def voucher_applications_list(request):
     - Other mods: see only applications for vouchers they created or
       whose provider matches their office name.
     """
+    reconcile_expired_voucher_state()
+
     user = request.user
 
     if user.role == 'ADMIN' or is_oaa_mod(user):
@@ -1171,6 +1207,8 @@ def approve_voucher_application(request, application_id):
     Approve or reject a voucher application.
     Allowed: Admin, OAA moderators, or the moderator who created the voucher.
     """
+    reconcile_expired_voucher_state()
+
     try:
         application = VoucherApplication.objects.get(id=application_id)
     except VoucherApplication.DoesNotExist:

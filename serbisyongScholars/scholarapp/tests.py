@@ -572,6 +572,8 @@ class VoucherSystemTests(APITestCase):
         # Create Users
         self.admin_user = User.objects.create_user(username='admin', password='password', role='ADMIN')
         self.scholar_user = User.objects.create_user(username='scholar', password='password', role='SCHOLAR')
+        self.oaa_mod_user = User.objects.create_user(username='oaamod', password='password', role='MODERATOR')
+        ModeratorProfile.objects.create(user=self.oaa_mod_user, office_name='Office of Admission and Aid')
         
         # Create a test voucher
         self.voucher = Voucher.objects.create(
@@ -641,3 +643,88 @@ class VoucherSystemTests(APITestCase):
         
         app.refresh_from_db()
         self.assertEqual(app.status, 'REJECTED')
+
+    def test_admin_can_edit_voucher(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.put(
+            f'/api/vouchers/{self.voucher.id}/',
+            {'title': 'Updated by Admin'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.title, 'Updated by Admin')
+
+    def test_oaa_moderator_cannot_edit_voucher(self):
+        self.client.force_authenticate(user=self.oaa_mod_user)
+        response = self.client.put(
+            f'/api/vouchers/{self.voucher.id}/',
+            {'title': 'Moderator Edit'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_voucher_rejects_past_expiry_date(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post('/api/vouchers/', {
+            'title': 'Expired Voucher',
+            'description': 'Should not be created',
+            'category': 'FOODSTUB',
+            'provider': 'Kitchen City',
+            'total_slots': 5,
+            'status': 'ACTIVE',
+            'expiry_date': (date.today() - timedelta(days=1)).isoformat(),
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('expiry_date', response.data)
+
+    def test_create_voucher_allows_today_expiry_date(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post('/api/vouchers/', {
+            'title': 'Today Voucher',
+            'description': 'Valid for today',
+            'category': 'FOODSTUB',
+            'provider': 'Kitchen City',
+            'total_slots': 5,
+            'status': 'ACTIVE',
+            'expiry_date': date.today().isoformat(),
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_expired_pending_applications_are_auto_declined(self):
+        self.client.force_authenticate(user=self.scholar_user)
+        self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.remaining_slots, 1)
+
+        self.voucher.expiry_date = date.today() - timedelta(days=1)
+        self.voucher.status = 'ACTIVE'
+        self.voucher.save(update_fields=['expiry_date', 'status'])
+
+        response = self.client.get('/api/vouchers/my-applications/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        app = VoucherApplication.objects.get(scholar=self.scholar_user, voucher=self.voucher)
+        app.refresh_from_db()
+        self.assertEqual(app.status, 'REJECTED')
+        self.assertIn('Auto-declined', app.admin_notes)
+
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.status, 'EXPIRED')
+        self.assertEqual(self.voucher.remaining_slots, 2)
+
+    def test_non_expired_pending_application_remains_pending(self):
+        self.client.force_authenticate(user=self.scholar_user)
+        apply_response = self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+        self.assertEqual(apply_response.status_code, status.HTTP_201_CREATED)
+
+        response = self.client.get('/api/vouchers/my-applications/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        app = VoucherApplication.objects.get(scholar=self.scholar_user, voucher=self.voucher)
+        self.assertEqual(app.status, 'PENDING')

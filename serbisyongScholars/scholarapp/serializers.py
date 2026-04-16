@@ -167,6 +167,11 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 class VoucherSerializer(serializers.ModelSerializer):
     is_available = serializers.BooleanField(read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+
+    def validate_expiry_date(self, value):
+        if value < date.today():
+            raise serializers.ValidationError('Expiry date cannot be yesterday or in the past.')
+        return value
     
     class Meta:
         model = Voucher
