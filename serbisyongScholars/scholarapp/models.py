@@ -35,7 +35,7 @@ class User(AbstractUser):
             return self.role
 
         try:
-            self.moderator_profile
+            self.moderator_profile  # type: ignore
             return 'MODERATOR'
         except ObjectDoesNotExist:
             return self.role
@@ -43,7 +43,7 @@ class User(AbstractUser):
     @property
     def assigned_office(self):
         try:
-            return self.moderator_profile.office_name
+            return self.moderator_profile.office_name  # type: ignore
         except ObjectDoesNotExist:
             return None
 
@@ -178,7 +178,7 @@ class Announcement(models.Model):
     rejection_reason = models.TextField(blank=True, null=True)
     
     def __str__(self):
-        return f"{self.title} ({self.get_status_display()})"
+        return f"{self.title} ({self.get_status_display()})"  # type: ignore
     
     class Meta:
         ordering = ['-created_at']
