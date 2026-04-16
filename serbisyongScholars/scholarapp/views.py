@@ -549,49 +549,41 @@ def user_profile(request):
     if request.method == 'GET':
         username = request.GET.get('username')
         student_id = request.GET.get('student_id')
+        me = request.GET.get('me') == 'true'
         
-        if not username and not student_id:
-            return Response({'error': 'Please provide a username or student_id.'}, status=400)
+        if not username and not student_id and not me:
+            return Response({'error': 'Please provide a username, student_id, or me=true.'}, status=400)
 
         try:
-            if student_id:
-                # Find user by student_id
+            if me:
+                user = request.user
+            elif student_id:
                 scholar_profile = ScholarProfile.objects.select_related('user').get(student_id=student_id)
                 user = scholar_profile.user
             else:
-                # Find user by username
                 user = User.objects.get(username=username)
-        except ScholarProfile.DoesNotExist:
-            return Response({'error': 'Scholar not found'}, status=404)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=404)
-    else:  # PUT
-        username = request.data.get('username')
-        if not username:
-            return Response({'error': 'Please provide a username.'}, status=400)
-        
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
+        except (ScholarProfile.DoesNotExist, User.DoesNotExist):
             return Response({'error': 'User not found'}, status=404)
 
-    scholar = getattr(user, 'scholar_profile', None)
-    moderator = getattr(user, 'moderator_profile', None)
+        scholar = getattr(user, 'scholar_profile', None)
+        moderator = getattr(user, 'moderator_profile', None)
 
-    if request.method == 'GET':
         data = {
             'username': user.username,
-            'name': f"{user.first_name} {user.last_name}",
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'name': user.get_full_name() or user.username,
             'email': user.email,
             'role': user.role,
             'student_id': getattr(scholar, 'student_id', None),
+            'school': getattr(scholar, 'school', None),
             'course_department': getattr(scholar, 'program_course', None),
             'grant_type': getattr(scholar, 'scholar_grant', None),
             'total_hours_rendered': getattr(scholar, 'total_hours_rendered', 0),
             'required_hours': getattr(scholar, 'required_hours', 10),
             'carry_over_hours': getattr(scholar, 'carry_over_hours', 0),
             'is_dormer': getattr(scholar, 'is_dormer', False),
-            'assigned_office': getattr(moderator, 'office_name', None),
+            'office_name': getattr(moderator, 'office_name', None),
             'service_logs': []
         }
 
@@ -614,30 +606,82 @@ def user_profile(request):
     if not request.user.is_authenticated:
         return Response({'error': 'Authentication required to update profile.'}, status=401)
 
-    payload = request.data
-    updated = False
-    
-    if 'role' in payload:
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin access required to change role.'}, status=403)
-        new_role = payload.get('role')
-        if new_role in dict(User.ROLE_CHOICES):
-            user.role = new_role
-            updated = True
-            
-    if 'first_name' in payload and request.user == user:
-        user.first_name = payload.get('first_name')
-        updated = True
-        
-    if 'last_name' in payload and request.user == user:
-        user.last_name = payload.get('last_name')
-        updated = True
+    username_param = request.data.get('username')
+    if not username_param:
+        return Response({'error': 'Please provide a username.'}, status=400)
 
-    if updated:
+    try:
+        user = User.objects.get(username=username_param)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+
+    # Only self can edit own profile, or an Admin can edit anyone
+    is_self = request.user == user
+    is_admin = request.user.role == 'ADMIN'
+
+    if not is_self and not is_admin:
+        return Response({'error': 'Permission denied.'}, status=403)
+
+    scholar = getattr(user, 'scholar_profile', None)
+    payload = request.data
+    user_updated = False
+    scholar_updated = False
+
+    # --- Fields always editable by self OR admin ---
+    if 'first_name' in payload:
+        user.first_name = payload.get('first_name')
+        user_updated = True
+    if 'last_name' in payload:
+        user.last_name = payload.get('last_name')
+        user_updated = True
+    if 'email' in payload and is_admin:
+        # Email only editable by admin
+        user.email = payload.get('email')
+        user_updated = True
+
+    # --- Admin-only fields ---
+    if is_admin:
+        if 'role' in payload:
+            new_role = payload.get('role')
+            if new_role in dict(User.ROLE_CHOICES):
+                user.role = new_role
+                user_updated = True
+        if 'grant_type' in payload and scholar:
+            scholar.scholar_grant = payload.get('grant_type')
+            scholar_updated = True
+            
+        # Username change (Now strictly Admin-only)
+        new_username = payload.get('new_username', '').strip()
+        if new_username and new_username != user.username:
+            if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
+                return Response({'error': 'That username is already taken.'}, status=400)
+            user.username = new_username
+            user_updated = True
+
+    # --- Scholar fields: editable by self (if scholar) OR admin ---
+    if scholar:
+        from .models import ScholarProfile
+        if 'school' in payload:
+            new_school = payload.get('school')
+            if new_school in [c[0] for c in ScholarProfile.SCHOOL_CHOICES]:
+                scholar.school = new_school
+                scholar_updated = True
+        if 'program_course' in payload:
+            scholar.course_department = payload.get('program_course')
+            scholar_updated = True
+        if 'year_level' in payload:
+            scholar.year_level = payload.get('year_level')
+            scholar_updated = True
+
+    if user_updated:
         user.save()
+    if scholar_updated:
+        scholar.save()
+
+    if user_updated or scholar_updated:
         return Response({'message': 'Profile updated successfully.'})
     else:
-        return Response({'message': 'No changes made.'}, status=400)
+        return Response({'message': 'No changes detected.'}, status=200)
 
 @login_required(login_url='/login/')
 def profile_page(request):
