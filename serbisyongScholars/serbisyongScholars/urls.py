@@ -28,6 +28,7 @@ urlpatterns = [
     path('scholar/dashboard/', TemplateView.as_view(template_name='dashboard.html'), name='scholar_dashboard'),
     path('dashboard/admin/', TemplateView.as_view(template_name='admin_dashboard.html'), name='admin_dashboard'),
     path('moderator/dashboard/', TemplateView.as_view(template_name='moderator_dashboard.html'), name='moderator_dashboard'),
+    path('audit-logs/', scholar_views.audit_logs_page, name='audit_logs'),
     path('verify/', TemplateView.as_view(template_name='verify.html'), name='verify'),
     path('profile/', scholar_views.profile_page, name='profile'),
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
