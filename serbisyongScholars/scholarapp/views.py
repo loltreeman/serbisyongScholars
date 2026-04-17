@@ -1040,15 +1040,16 @@ def remove_moderator(request):
     
     try:
         user = User.objects.get(username=username)
-        if user.role != 'MODERATOR':
+
+        has_mod_profile = ModeratorProfile.objects.filter(user=user).exists()
+        if user.role != 'MODERATOR' and not has_mod_profile:
             return Response({'error': 'User is not a moderator'}, status=400)
-        
+
+        # Always reset role to SCHOLAR and remove any lingering profile
         user.role = 'SCHOLAR'
         user.save()
-        
-        # Delete moderator profile if it exists
         ModeratorProfile.objects.filter(user=user).delete()
-        
+
         return Response({'message': f'User {username} demoted to Scholar successfully'})
     except User.DoesNotExist:
         return Response({'error': 'User not found'}, status=404)
