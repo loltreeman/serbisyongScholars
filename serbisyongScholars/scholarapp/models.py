@@ -296,6 +296,31 @@ class Penalty(models.Model):
     def __str__(self):
         return f"{self.scholar.username} - {self.reason[:50]} ({self.status}) - {self.hours_added}hrs"
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.recalculate_scholar_penalties()
+
+    def delete(self, *args, **kwargs):
+        scholar = self.scholar # Keep reference
+        super().delete(*args, **kwargs)
+        # Recalculate after deletion
+        active_penalties = Penalty.objects.filter(scholar=scholar, status='ACTIVE').aggregate(Sum('hours_added'))['hours_added__sum'] or 0
+        ScholarProfile.objects.filter(user=scholar).update(penalty_hours=active_penalties)
+        # Safety check: only call save if profile exists
+        if hasattr(scholar, 'scholar_profile'):
+            scholar.scholar_profile.save()
+
+    def recalculate_scholar_penalties(self):
+        # Sum all ACTIVE penalties for this scholar
+        active_penalties = Penalty.objects.filter(scholar=self.scholar, status='ACTIVE').aggregate(Sum('hours_added'))['hours_added__sum'] or 0
+        # Update ScholarProfile penalty_hours
+        ScholarProfile.objects.filter(user=self.scholar).update(penalty_hours=active_penalties)
+        
+        # Safety check: only call save if profile exists
+        if hasattr(self.scholar, 'scholar_profile'):
+            profile = self.scholar.scholar_profile
+            profile.save() # This triggers the dormer/penalty logic in ScholarProfile.save()
+
 
 class SemesterSettings(models.Model):
     term_name = models.CharField(max_length=100) # e.g. "1st Semester 2026-2027"

@@ -415,6 +415,21 @@ async function loadPenaltyLogs() {
             data.forEach(log => {
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-gray-50 transition';
+                
+                let actionButtons = '';
+                if (log.status === 'ACTIVE') {
+                    actionButtons = `
+                        <div class="flex gap-2">
+                            <button onclick="updatePenaltyStatus(${log.id}, 'WAIVED')" 
+                                    class="text-gray-600 hover:text-gray-900 text-xs font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                                Waive
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    actionButtons = '<span class="text-xs text-gray-400 italic">No actions</span>';
+                }
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         ${new Date(log.created_at).toLocaleDateString()}
@@ -429,19 +444,59 @@ async function loadPenaltyLogs() {
                         +${log.hours_added}h
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${log.status === 'ACTIVE' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${getStatusClasses(log.status)}">
                             ${log.status}
                         </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${actionButtons}
                     </td>
                 `;
                 tbody.appendChild(row);
             });
         } else {
-             tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-rose-500 text-sm">Failed to load penalties. Server error.</td></tr>';
+             tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-rose-500 text-sm">Failed to load penalties. Server error.</td></tr>';
         }
     } catch (error) {
         console.error("Failed to load penalty logs:", error);
-        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-rose-500 text-sm">Network error while loading penalties.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-rose-500 text-sm">Network error while loading penalties.</td></tr>';
+    }
+}
+
+function getStatusClasses(status) {
+    switch(status) {
+        case 'ACTIVE': return 'bg-orange-100 text-orange-800';
+        case 'RESOLVED': return 'bg-green-100 text-green-800';
+        case 'WAIVED': return 'bg-gray-100 text-gray-800';
+        default: return 'bg-blue-100 text-blue-800';
+    }
+}
+
+async function updatePenaltyStatus(penaltyId, newStatus) {
+    if (!confirm(`Are you sure you want to change this penalty to ${newStatus}?`)) return;
+
+    try {
+        const response = await fetch(`/api/penalties/${penaltyId}/`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+                Authorization: `Bearer ${localStorage.getItem("access")}`,
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+
+        if (response.ok) {
+            alert(`Penalty marked as ${newStatus}`);
+            loadPenaltyLogs();
+            loadScholars(); // Refresh scholars as their hours will have changed!
+        } else {
+            const err = await response.json();
+            alert("Failed to update: " + (err.error || JSON.stringify(err)));
+        }
+    } catch (error) {
+        console.error("Error updating penalty status:", error);
+        alert("An error occurred while updating status.");
     }
 }
 

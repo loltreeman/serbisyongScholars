@@ -14,6 +14,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.views.decorators.csrf import csrf_exempt
+from django.db import models, transaction, IntegrityError
 from django.conf import settings
 from django.shortcuts import render, redirect
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -1312,12 +1313,17 @@ def apply_voucher(request, voucher_id):
     # Create application
     notes = request.data.get('notes', '')
     
-    application = VoucherApplication.objects.create(
-        voucher=voucher,
-        scholar=request.user,
-        notes=notes,
-        status='PENDING'
-    )
+    try:
+        application = VoucherApplication.objects.create(
+            voucher=voucher,
+            scholar=request.user,
+            notes=notes,
+            status='PENDING'
+        )
+    except IntegrityError:
+        return Response({'error': 'You have already applied for this voucher (request busy)'}, status=400)
+    
+    return Response({'message': 'Application submitted successfully'}, status=201)
     
     # Slot decrement is now handled on APPROVAL, not on application
     # to avoid slot leakage from rejected/pending applications.
@@ -1423,12 +1429,16 @@ def approve_voucher_application(request, application_id):
         application.admin_notes = admin_notes
         application.save()
         
-        # Decrement slot on APPROVAL
+        # Decrement slot on APPROVAL using atomic F expression
         voucher = application.voucher
-        voucher.remaining_slots -= 1
+        voucher.remaining_slots = F('remaining_slots') - 1
+        voucher.save()
+        
+        # Refresh from DB to check if we hit zero for status update
+        voucher.refresh_from_db()
         if voucher.remaining_slots <= 0:
             voucher.status = 'FULL'
-        voucher.save()
+            voucher.save()
         
         return Response({'message': 'Application approved'}, status=200)
     
@@ -1598,11 +1608,10 @@ def process_penalties(request):
                 status='ACTIVE'
             )
 
-            # 2. Add 50 hours + missing hours to penalty_hours 
-            # and reset rendering for NEW semester
-            profile.penalty_hours += (50.0 + missing_hours)
+            # 2. Reset rendering for NEW semester
+            # The penalty hours are now handled automatically by Penalty.save()
             profile.total_hours_rendered = 0.0
-            profile.save() # This will trigger required_hours update in ScholarProfile.save()
+            profile.save() 
             penalty_count += 1
         
         # Mark semester as processed
