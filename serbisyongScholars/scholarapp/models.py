@@ -138,16 +138,38 @@ class ServiceLog(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
-        # Recalculate total hours atomically
-        total = ServiceLog.objects.filter(scholar=self.scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+        # Recalculate total hours atomically for the ACTIVE semester
+        from scholarapp.models import SemesterSettings
+        active_term = SemesterSettings.objects.filter(is_active=True).first()
+        
+        if active_term:
+            total = ServiceLog.objects.filter(
+                scholar=self.scholar,
+                date_rendered__gte=active_term.start_date,
+                date_rendered__lte=active_term.end_date
+            ).aggregate(Sum('hours'))['hours__sum'] or 0
+        else:
+            total = ServiceLog.objects.filter(scholar=self.scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+            
         ScholarProfile.objects.filter(pk=self.scholar.pk).update(total_hours_rendered=total)
 
     def delete(self, *args, **kwargs):
         scholar = self.scholar
         super().delete(*args, **kwargs)
 
-        # Recalculate total hours atomically
-        total = ServiceLog.objects.filter(scholar=scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+        # Recalculate total hours atomically for the ACTIVE semester
+        from scholarapp.models import SemesterSettings
+        active_term = SemesterSettings.objects.filter(is_active=True).first()
+        
+        if active_term:
+            total = ServiceLog.objects.filter(
+                scholar=scholar,
+                date_rendered__gte=active_term.start_date,
+                date_rendered__lte=active_term.end_date
+            ).aggregate(Sum('hours'))['hours__sum'] or 0
+        else:
+            total = ServiceLog.objects.filter(scholar=scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+            
         ScholarProfile.objects.filter(pk=scholar.pk).update(total_hours_rendered=total)
 
 class Announcement(models.Model):
@@ -281,6 +303,7 @@ class SemesterSettings(models.Model):
     end_date = models.DateField()
     deadline_date = models.DateField()
     is_active = models.BooleanField(default=False)
+    penalties_processed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

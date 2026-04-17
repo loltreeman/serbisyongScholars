@@ -252,9 +252,9 @@ class VoucherApplicationSerializer(serializers.ModelSerializer):
 class PenaltySerializer(serializers.ModelSerializer):
     scholar_name = serializers.CharField(source='scholar.get_full_name', read_only=True)
     scholar_username = serializers.CharField(source='scholar.username', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    semester_name = serializers.CharField(source='semester.term_name', read_only=True)
+    semester_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Penalty
@@ -264,6 +264,12 @@ class PenaltySerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'created_at', 'updated_at', 'notes'
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at']
+
+    def get_semester_name(self, obj):
+        return obj.semester.term_name if obj.semester else "N/A"
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() if obj.created_by else "System"
 
 class SemesterSettingsSerializer(serializers.ModelSerializer):
     class Meta:

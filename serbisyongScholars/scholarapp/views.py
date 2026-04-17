@@ -19,8 +19,8 @@ from django.shortcuts import render, redirect
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.db.models import Avg, Q, Sum
-from datetime import date
+from django.db.models import Avg, Q, Sum, F
+from datetime import date, timedelta
 
 from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty, SemesterSettings
 from scholarapp.serializers import (
@@ -1570,6 +1570,9 @@ def process_penalties(request):
     if today < semester.deadline_date:
          return Response({'error': f'Cannot process penalties before the deadline ({semester.deadline_date})'}, status=400)
 
+    if semester.penalties_processed:
+        return Response({'error': f'Penalties for {semester.term_name} have already been processed.'}, status=400)
+
     # Find violators: scholars whose total_hours_rendered < required_hours
     # We filter by role='SCHOLAR' to be safe
     violators = ScholarProfile.objects.filter(
@@ -1580,24 +1583,53 @@ def process_penalties(request):
     penalty_count = 0
     with threading.Lock(): # Simple concurrency protection for bulk update
         for profile in violators:
+            # Calculate exactly how many required hours they missed rendering
+            missing_hours = profile.required_hours - profile.total_hours_rendered
+            if missing_hours < 0:
+                missing_hours = 0.0
+
             # 1. Create Penalty record
             Penalty.objects.create(
                 scholar=profile.user,
-                reason=f"Failed to meet service hours for {semester.term_name}. Deadline: {semester.deadline_date}",
-                hours_added=50.0,
+                reason=f"Failed to meet service hours for {semester.term_name}. Deadline: {semester.deadline_date}. Missing: {missing_hours}h",
+                hours_added=50.0 + missing_hours,
                 semester=semester,
                 created_by=request.user,
                 status='ACTIVE'
             )
 
-            # 2. Add 50 hours to penalty_hours and reset rendering for NEW semester
-            profile.penalty_hours += 50.0
+            # 2. Add 50 hours + missing hours to penalty_hours 
+            # and reset rendering for NEW semester
+            profile.penalty_hours += (50.0 + missing_hours)
             profile.total_hours_rendered = 0.0
             profile.save() # This will trigger required_hours update in ScholarProfile.save()
             penalty_count += 1
+        
+        # Mark semester as processed
+        semester.penalties_processed = True
+        semester.save()
+
+        # 3. Auto-create NEXT Semester
+        new_start = semester.end_date + timedelta(days=1)
+        if new_start < today:
+             new_start = today
+             
+        new_end = new_start + timedelta(days=150) # Approx 5 months
+        new_deadline = new_end - timedelta(days=14) # 2 weeks before end
+        
+        # Determine next term name if possible, else generic
+        next_term_name = f"Next Semester (Auto-created from {semester.term_name})"
+        
+        SemesterSettings.objects.create(
+            term_name=next_term_name,
+            start_date=new_start,
+            end_date=new_end,
+            deadline_date=new_deadline,
+            is_active=True # This will deactivate the current one automatically via model save() logic
+        )
 
     return Response({
-        'message': f'Successfully processed penalties for {penalty_count} scholars.',
+        'message': f'Successfully processed penalties for {penalty_count} scholars. A new semester has been created.',
         'semester': semester.term_name,
         'count': penalty_count
     })

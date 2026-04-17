@@ -104,6 +104,7 @@ function updateFilterSummary(data, filters) {
 }
 
 let activeSemesterId = null;
+let activeSemesterData = null;
 
 function initSemesterManagement() {
     loadSemesterSettings();
@@ -120,14 +121,30 @@ async function loadSemesterSettings() {
             const data = await response.json();
             const active = data.find(s => s.is_active);
             const infoDiv = document.getElementById('active-semester-info');
+            const editBtn = document.getElementById('edit-semester-btn');
+
             if (active && infoDiv) {
                 activeSemesterId = active.id;
+                activeSemesterData = active;
+                
+                const start = new Date(active.start_date).toLocaleDateString();
+                const end = new Date(active.end_date).toLocaleDateString();
+                const deadline = new Date(active.deadline_date).toLocaleDateString();
+
                 infoDiv.innerHTML = `
-                    <span class="font-bold text-gray-900">${active.term_name}</span> 
-                    (Deadline: <span class="text-rose-600 font-bold">${new Date(active.deadline_date).toLocaleDateString()}</span>)
+                    <div class="flex flex-col gap-1">
+                        <span class="font-bold text-gray-900 text-base">${active.term_name}</span> 
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                            <span>Start: <b class="text-gray-700">${start}</b></span>
+                            <span>End: <b class="text-gray-700">${end}</b></span>
+                            <span class="px-2 py-0.5 bg-rose-50 text-rose-600 rounded border border-rose-100 font-bold uppercase tracking-tight">Penalty Deadline: ${deadline}</span>
+                        </div>
+                    </div>
                 `;
+                if (editBtn) editBtn.classList.remove('hidden');
             } else if (infoDiv) {
                 infoDiv.textContent = "No active semester set. Please setup a new one.";
+                if (editBtn) editBtn.classList.add('hidden');
             }
         }
     } catch (error) {
@@ -138,12 +155,33 @@ async function loadSemesterSettings() {
 function initSemesterModal() {
     const modal = document.getElementById('semester-modal');
     const openBtn = document.getElementById('open-semester-modal');
+    const editBtn = document.getElementById('edit-semester-btn');
     const closeBtn = document.getElementById('close-semester-modal');
     const form = document.getElementById('semester-form');
+    const modalTitle = document.getElementById('modal-title-text');
+    const idInput = document.getElementById('semester-id');
 
     if (openBtn && modal) {
         openBtn.addEventListener("click", () => {
-            console.log("Opening semester modal");
+            if (modalTitle) modalTitle.textContent = "Setup New Semester";
+            if (idInput) idInput.value = "";
+            form.reset();
+            modal.classList.remove('hidden');
+        });
+    }
+
+    if (editBtn && modal) {
+        editBtn.addEventListener("click", () => {
+            if (!activeSemesterData) return;
+            if (modalTitle) modalTitle.textContent = "Edit Active Semester";
+            if (idInput) idInput.value = activeSemesterData.id;
+            
+            form.elements['term_name'].value = activeSemesterData.term_name;
+            form.elements['start_date'].value = activeSemesterData.start_date;
+            form.elements['end_date'].value = activeSemesterData.end_date;
+            form.elements['deadline_date'].value = activeSemesterData.deadline_date;
+            form.elements['is_active'].checked = activeSemesterData.is_active;
+            
             modal.classList.remove('hidden');
         });
     }
@@ -156,6 +194,9 @@ function initSemesterModal() {
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
             const formData = new FormData(form);
+            const sid = formData.get('id');
+            const method = sid ? 'PUT' : 'POST';
+
             const payload = {
                 term_name: formData.get('term_name'),
                 start_date: formData.get('start_date'),
@@ -164,9 +205,11 @@ function initSemesterModal() {
                 is_active: form.elements['is_active'] ? form.elements['is_active'].checked : false
             };
 
+            if (sid) payload.id = parseInt(sid);
+
             try {
                 const response = await fetch('/api/admin/semester-settings/', {
-                    method: 'POST',
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': getCookie('csrftoken'),
@@ -179,7 +222,7 @@ function initSemesterModal() {
                     modal.classList.add('hidden');
                     form.reset();
                     loadSemesterSettings();
-                    alert("Semester created successfully!");
+                    alert(sid ? "Semester updated successfully!" : "Semester created successfully!");
                 } else {
                     const err = await response.json();
                     alert("Error: " + JSON.stringify(err));
@@ -220,6 +263,7 @@ function initProcessPenalties() {
                     alert(`${data.message}`);
                     loadScholars(); 
                     loadPenaltyLogs();
+                    loadSemesterSettings(); // Refresh to show the new auto-created semester
                 } else {
                     alert(`Action denied: ${data.error || JSON.stringify(data)}`);
                 }
@@ -392,9 +436,12 @@ async function loadPenaltyLogs() {
                 `;
                 tbody.appendChild(row);
             });
+        } else {
+             tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-rose-500 text-sm">Failed to load penalties. Server error.</td></tr>';
         }
     } catch (error) {
         console.error("Failed to load penalty logs:", error);
+        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-rose-500 text-sm">Network error while loading penalties.</td></tr>';
     }
 }
 
