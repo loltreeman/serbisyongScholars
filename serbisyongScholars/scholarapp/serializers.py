@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
-from .models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty
 from datetime import date
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -196,7 +196,6 @@ class VoucherSerializer(serializers.ModelSerializer):
             return None
         
         # Find if scholar has applied to this voucher
-        from .models import VoucherApplication
         app = VoucherApplication.objects.filter(
             voucher=obj,
             scholar=request.user

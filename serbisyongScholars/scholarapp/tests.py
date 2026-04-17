@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from datetime import date, timedelta
-from .models import Announcement, User, ScholarProfile, ServiceLog, ModeratorProfile, Voucher, VoucherApplication
+from scholarapp.models import Announcement, User, ScholarProfile, ServiceLog, ModeratorProfile, Voucher, VoucherApplication
 
 User = get_user_model()
 

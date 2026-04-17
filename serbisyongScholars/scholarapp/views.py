@@ -5,28 +5,28 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
 from django.contrib.auth.decorators import login_required
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.mail import send_mail
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.shortcuts import render, redirect
-from .serializers import RegistrationSerializer, ServiceLogSerializer, AnnouncementSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
-from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty
-from .serializers import VoucherSerializer, VoucherApplicationSerializer, PenaltySerializer
-from django.http import JsonResponse
 from datetime import date
-from django.db.models import Q
+
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty
+from scholarapp.serializers import (
+    RegistrationSerializer, ServiceLogSerializer, AnnouncementSerializer,
+    VoucherSerializer, VoucherApplicationSerializer, PenaltySerializer
+)
 
 
 User = get_user_model()

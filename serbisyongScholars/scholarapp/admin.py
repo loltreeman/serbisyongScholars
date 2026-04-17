@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, ScholarProfile, ServiceLog, Announcement
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty
 
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
@@ -31,9 +31,6 @@ class AnnouncementAdmin(admin.ModelAdmin):
     list_display = ('title', 'category', 'created_at', 'author')
     list_filter = ('category', 'created_at')
     search_fields = ('title', 'content')
-
-from django.contrib import admin
-from .models import Voucher, VoucherApplication, Penalty
 
 @admin.register(Voucher)
 class VoucherAdmin(admin.ModelAdmin):
