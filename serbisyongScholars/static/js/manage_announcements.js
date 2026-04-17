@@ -1,6 +1,29 @@
 let allAnnouncements = [];
 let currentStatus = 'PENDING';
 
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function parseActionResponse(response) {
+    try {
+        return await response.json();
+    } catch (_error) {
+        return {};
+    }
+}
+
 async function loadAnnouncements() {
     try {
         const response = await fetch('/api/announcements/', {
@@ -93,48 +116,63 @@ async function approveAnnouncement(id) {
     if (!confirm('Approve this announcement?')) return;
     
     try {
+        const csrfToken = getCookie('csrftoken');
         const response = await fetch(`/api/announcements/${id}/approve/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
             credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': csrfToken || ''
+            },
             body: JSON.stringify({ action: 'approve' })
         });
-        
-        if (response.ok) {
-            alert('Announcement approved!');
-            loadAnnouncements();
+
+        const data = await parseActionResponse(response);
+
+        if (!response.ok) {
+            throw new Error(data.error || data.message || 'Failed to approve announcement');
         }
+
+        alert(data.message || 'Announcement approved!');
+        loadAnnouncements();
     } catch (error) {
         console.error('Error:', error);
-        alert('Failed to approve announcement');
+        alert(error.message || 'Failed to approve announcement');
     }
 }
 
 async function rejectAnnouncement(id) {
     const reason = prompt('Rejection reason (optional):');
+    if (reason === null) return;
     
     try {
+        const csrfToken = getCookie('csrftoken');
         const response = await fetch(`/api/announcements/${id}/approve/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
             credentials: 'same-origin',
-            body: JSON.stringify({ 
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                'X-CSRFToken': csrfToken || ''
+            },
+            body: JSON.stringify({
                 action: 'reject',
                 rejection_reason: reason || ''
             })
         });
-        
-        if (response.ok) {
-            alert('Announcement rejected');
-            loadAnnouncements();
+
+        const data = await parseActionResponse(response);
+
+        if (!response.ok) {
+            throw new Error(data.error || data.message || 'Failed to reject announcement');
         }
+
+        alert(data.message || 'Announcement rejected');
+        loadAnnouncements();
     } catch (error) {
         console.error('Error:', error);
-        alert('Failed to reject announcement');
+        alert(error.message || 'Failed to reject announcement');
     }
 }
 

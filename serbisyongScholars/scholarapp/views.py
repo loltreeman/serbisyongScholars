@@ -13,7 +13,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.http import HttpResponseForbidden, JsonResponse
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.db import models, transaction, IntegrityError
 from django.conf import settings
 from django.shortcuts import render, redirect
@@ -926,6 +926,7 @@ def approve_announcement(request, announcement_id):
     else:
         return Response({'error': 'Invalid action'}, status=400)
   
+@ensure_csrf_cookie
 @login_required(login_url='/login/')
 def announcements_page(request):
     """Render announcements page"""
@@ -933,6 +934,7 @@ def announcements_page(request):
         'announcement_categories': get_announcement_category_options(),
     })
 
+@ensure_csrf_cookie
 @login_required(login_url='/login/')
 def announcement_detail_view(request, announcement_id):
     """Render single announcement detail page"""
@@ -959,6 +961,7 @@ def dashboard_router(request):
     else:  
         return redirect('scholar_dashboard')
 
+@ensure_csrf_cookie
 @login_required(login_url='/login/')
 def manage_announcements_view(request):
     """Render the management page for Admins/Moderators"""
