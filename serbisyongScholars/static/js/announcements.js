@@ -82,10 +82,7 @@ async function syncCurrentUser() {
 
     try {
         const response = await fetch('/api/auth/me/', {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            },
-            credentials: 'omit'
+            credentials: 'same-origin'
         });
 
         if (!response.ok) {
@@ -114,10 +111,7 @@ async function syncCurrentUser() {
 async function loadAnnouncements() {
     try {
         const response = await fetch('/api/announcements/', {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access')}`  
-            },
-            credentials: 'omit'
+            credentials: 'same-origin'
         });
         
         if (!response.ok) throw new Error('Failed to load announcements');
@@ -141,22 +135,53 @@ async function loadAnnouncements() {
  */
 function renderAnnouncements(announcements) {
     const container = document.getElementById('announcements-container');
+    const requestsSection = document.getElementById('requests-section');
     
-    if (!announcements || announcements.length === 0) {
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    const liveAnnouncements = announcements.filter(a => a.status === 'APPROVED');
+    const requestAnnouncements = announcements.filter(a => a.status === 'PENDING' || a.status === 'REJECTED');
+    
+    const userRole = localStorage.getItem('userRole');
+    
+    if (requestsSection) {
+        // Show section if there are pending/rejected items and user is ADMIN or MODERATOR
+        if (requestAnnouncements.length > 0 && (userRole === 'ADMIN' || userRole === 'MODERATOR')) {
+            requestsSection.classList.remove('hidden');
+            
+            const titleEl = document.getElementById('requests-section-title');
+            const descEl = document.getElementById('requests-section-desc');
+            
+            if (titleEl && descEl) {
+                if (userRole === 'MODERATOR') {
+                    titleEl.textContent = 'My Announcements';
+                    descEl.textContent = 'Manage your office announcements and check their approval status.';
+                } else {
+                    titleEl.textContent = 'Announcement Requests';
+                    descEl.textContent = 'Review, approve, or reject announcements submitted by office moderators.';
+                }
+            }
+        } else {
+            requestsSection.classList.add('hidden');
+        }
+    }
+    
+    // Handle Live Section
+    if (liveAnnouncements.length === 0) {
         const categoryLabel = currentFilter === 'all'
             ? 'announcements'
             : `${getCategoryInfo(currentFilter).label.toLowerCase()} announcements`;
         container.innerHTML = `
-            <div class="text-center py-12">
-                <p class="text-gray-500 text-lg">No ${categoryLabel} yet</p>
+            <div class="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-200">
+                <p class="text-gray-500">No approved ${categoryLabel} found.</p>
             </div>
         `;
         return;
     }
     
-    container.innerHTML = '';
-    
-    announcements.forEach(announcement => {
+    liveAnnouncements.forEach(announcement => {
         const card = createAnnouncementCard(announcement);
         container.appendChild(card);
     });
@@ -167,7 +192,7 @@ function renderAnnouncements(announcements) {
  */
 function createAnnouncementCard(announcement) {
     const div = document.createElement('div');
-    div.className = 'bg-white rounded-lg shadow hover:shadow-lg transition p-6';
+    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full hover:shadow-md transition';
     
     const categoryInfo = getCategoryInfo(
         announcement.category,
@@ -185,24 +210,19 @@ function createAnnouncementCard(announcement) {
     // Determine if we should show status badge
     let showStatusBadge = false;
     if (userRole === 'ADMIN') {
-        showStatusBadge = true; // Admins see status on ALL posts
+        showStatusBadge = true;
     } else if (userRole === 'MODERATOR') {
         const isAuthor = announcement.author_username && announcement.author_username.toLowerCase() === currentUser.toLowerCase();
-        if (isAuthor) {
-            showStatusBadge = true;
-        }
+        if (isAuthor) showStatusBadge = true;
     }
     
-    // Show edit/delete buttons
+    // Actions (icons in top right)
     let showActions = false;
     if (userRole === 'ADMIN') {
         showActions = true;
-    } else if (userRole === 'MODERATOR' && announcement.author_username && announcement.author_username.toLowerCase() === currentUser.toLowerCase() && (announcement.status === 'PENDING' || announcement.status === 'REJECTED')) {
+    } else if (userRole === 'MODERATOR' && announcement.author_username && announcement.author_username.toLowerCase() === currentUser.toLowerCase()) {
         showActions = true;
     }
-    
-    // Show approve/reject buttons for pending announcements (ADMIN only)
-    const showApproval = userRole === 'ADMIN' && announcement.status === 'PENDING';
     
     div.innerHTML = `
         <div class="flex items-start justify-between mb-3">
@@ -211,73 +231,53 @@ function createAnnouncementCard(announcement) {
                     ${categoryInfo.label}
                 </span>
                 ${showStatusBadge ? `
-                    ${announcement.status === 'APPROVED' ? `
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                            Approved
-                        </span>
-                    ` : announcement.status === 'PENDING' ? `
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
-                            Pending
-                        </span>
-                    ` : announcement.status === 'REJECTED' ? `
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                            Rejected
-                        </span>
-                    ` : ''}
+                    <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
+                        ${announcement.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 
+                          announcement.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
+                          'bg-red-100 text-red-800'}">
+                        ${announcement.status}
+                    </span>
                 ` : ''}
             </div>
-            <span class="text-sm text-gray-500">${date}</span>
+            <div class="flex items-center gap-4">
+                <span class="text-xs text-gray-500">${date}</span>
+                ${showActions ? `
+                    <div class="flex items-center gap-2">
+                        <button onclick="event.stopPropagation(); editAnnouncement(${announcement.id})" 
+                                class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        </button>
+                        <button onclick="event.stopPropagation(); deleteAnnouncement(${announcement.id})" 
+                                class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                ` : ''}
+            </div>
         </div>
         
         <div class="cursor-pointer" onclick="window.location.href = '/announcements/${announcement.id}/'">
-            <h3 class="text-xl font-bold text-gray-900 mb-2">
+            <h3 class="text-xl font-bold text-gray-900 mb-1">
                 ${announcement.title}
             </h3>
             
-            <p class="text-gray-600 mb-4 line-clamp-3">
+            <p class="text-gray-600 mb-3 line-clamp-2 text-sm">
                 ${announcement.content}
             </p>
             
-            ${announcement.external_link ? `
-                <a href="${announcement.external_link}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium"> Learn More </a>
-            ` : ''}
-            
-            <div class="mt-4 pt-4 border-t border-gray-200">
-                <p class="text-sm text-gray-500">
-                    Posted by ${announcement.author_name || 'OAA'}
+            <div class="flex items-center justify-between mt-4">
+                <p class="text-xs text-gray-500">
+                    Posted by <span class="font-semibold">${announcement.author_name || 'OAA Administrator'}</span>
                 </p>
+                ${announcement.external_link ? `
+                    <a href="${announcement.external_link}" target="_blank" onclick="event.stopPropagation()" class="text-xs font-bold text-blue-600 hover:underline">Link →</a>
+                ` : ''}
             </div>
         </div>
         
-        ${showStatusBadge && announcement.rejection_reason ? `
-            <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p class="text-sm text-red-800"><strong>Rejection Reason:</strong> ${announcement.rejection_reason}</p>
-            </div>
-        ` : ''}
-        
-        ${showApproval ? `
-            <div class="mt-4 pt-4 border-t border-gray-200 flex gap-2">
-                <button onclick="event.stopPropagation(); approveAnnouncement(${announcement.id})" 
-                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
-                    Approve
-                </button>
-                <button onclick="event.stopPropagation(); rejectAnnouncementWithReason(${announcement.id})" 
-                        class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
-                    Reject
-                </button>
-            </div>
-        ` : ''}
-        
-        ${showActions && !showApproval ? `
-            <div class="mt-4 pt-4 border-t border-gray-200 flex gap-2">
-                <button onclick="event.stopPropagation(); editAnnouncement(${announcement.id})" 
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
-                    Edit
-                </button>
-                <button onclick="event.stopPropagation(); deleteAnnouncement(${announcement.id})" 
-                        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
-                    Delete
-                </button>
+        ${announcement.rejection_reason && announcement.status === 'REJECTED' ? `
+            <div class="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                <p class="text-xs text-red-800"><strong>Note:</strong> ${announcement.rejection_reason}</p>
             </div>
         ` : ''}
     `;
@@ -399,10 +399,9 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
             method: method,
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
-            credentials: 'omit',
+            credentials: 'same-origin',
             body: JSON.stringify(data)
         });
         
@@ -426,7 +425,7 @@ document.getElementById('announcement-form').addEventListener('submit', async (e
  * Edit announcement
  */
 function editAnnouncement(id) {
-    const announcement = allAnnouncements.find(a => a.id === id);
+    const announcement = allAnnouncements.find(a => a.id === parseInt(id));
     if (!announcement) return;
     
     editingAnnouncementId = id;
@@ -454,10 +453,9 @@ async function deleteAnnouncement(id) {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
-            credentials: 'omit',
+            credentials: 'same-origin',
             body: JSON.stringify({ id })
         });
         
@@ -499,10 +497,9 @@ async function approveAnnouncement(id) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
-            credentials: 'omit',
+            credentials: 'same-origin',
             body: JSON.stringify({ action: 'approve' })
         });
         
@@ -537,10 +534,9 @@ async function rejectAnnouncementWithReason(id) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access')}`,
                 'X-CSRFToken': csrftoken
             },
-            credentials: 'omit',
+            credentials: 'same-origin',
             body: JSON.stringify({ 
                 action: 'reject',
                 rejection_reason: reason || 'No reason provided'

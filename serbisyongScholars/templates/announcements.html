@@ -23,6 +23,19 @@
                 ➕ Create New Announcement
             </button>
         </div>
+
+        <!-- CTA: Announcement Requests -->
+        <div id="requests-section" class="hidden mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h3 id="requests-section-title" class="text-lg font-semibold text-gray-800 mb-1">Announcement Requests</h3>
+                    <p id="requests-section-desc" class="text-gray-600">Review, approve, or reject announcements submitted by office moderators.</p>
+                </div>
+                <a href="{% url 'manage_announcements' %}" class="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold">
+                    Manage Announcements
+                </a>
+            </div>
+        </div>
         
         <div class="bg-white rounded-lg shadow mb-6 p-4">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">

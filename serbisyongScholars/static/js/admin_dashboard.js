@@ -1,8 +1,13 @@
-let allScholars = [];
-
 document.addEventListener("DOMContentLoaded", function () {
-    bindFilterControls();
-    loadScholars();
+    console.log("Admin Dashboard Initializing...");
+    try {
+        bindFilterControls();
+        initSemesterManagement();
+        loadScholars();
+        loadPenaltyLogs();
+    } catch (err) {
+        console.error("Dashboard initialization failed:", err);
+    }
 });
 
 function bindFilterControls() {
@@ -11,22 +16,13 @@ function bindFilterControls() {
     const statusFilter = document.getElementById("filter-status");
     const schoolFilter = document.getElementById("filter-school");
     const searchInput = document.getElementById("search-input");
+    const penalizedFilter = document.getElementById("filter-penalized");
 
-    if (applyButton) {
-        applyButton.addEventListener("click", applyFilters);
-    }
-
-    if (resetButton) {
-        resetButton.addEventListener("click", resetFilters);
-    }
-
-    if (statusFilter) {
-        statusFilter.addEventListener("change", applyFilters);
-    }
-
-    if (schoolFilter) {
-        schoolFilter.addEventListener("change", applyFilters);
-    }
+    if (applyButton) applyButton.addEventListener("click", applyFilters);
+    if (resetButton) resetButton.addEventListener("click", resetFilters);
+    if (statusFilter) statusFilter.addEventListener("change", applyFilters);
+    if (schoolFilter) schoolFilter.addEventListener("change", applyFilters);
+    if (penalizedFilter) penalizedFilter.addEventListener("change", applyFilters);
 
     if (searchInput) {
         searchInput.addEventListener("keydown", (event) => {
@@ -39,93 +35,261 @@ function bindFilterControls() {
 }
 
 function getCurrentFilters() {
+    const statusEl = document.getElementById("filter-status");
+    const schoolEl = document.getElementById("filter-school");
+    const searchEl = document.getElementById("search-input");
+    const penalizedEl = document.getElementById("filter-penalized");
+
     return {
-        status: document.getElementById("filter-status").value,
-        school: document.getElementById("filter-school").value,
-        search: document.getElementById("search-input").value.trim(),
+        status: statusEl ? statusEl.value : "all",
+        school: schoolEl ? schoolEl.value : "all",
+        search: searchEl ? searchEl.value.trim() : "",
+        penalizedOnly: penalizedEl ? penalizedEl.checked : false
     };
 }
 
 function buildQueryString(filters) {
     const params = new URLSearchParams();
-
-    if (filters.status && filters.status !== "all") {
-        params.set("status", filters.status);
-    }
-
-    if (filters.school && filters.school !== "all") {
-        params.set("school", filters.school);
-    }
-
-    if (filters.search) {
-        params.set("search", filters.search);
-    }
-
+    if (filters.status && filters.status !== "all") params.set("status", filters.status);
+    if (filters.school && filters.school !== "all") params.set("school", filters.school);
+    if (filters.search) params.set("search", filters.search);
     const query = params.toString();
     return query ? `?${query}` : "";
 }
 
 async function loadScholars(filters = getCurrentFilters()) {
+    console.log("Loading scholars with filters:", filters);
     try {
         showLoading();
-
         const response = await fetch(`/api/admin/scholars/${buildQueryString(filters)}`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem("access")}`,
-            },
+            headers: { Authorization: `Bearer ${localStorage.getItem("access")}` },
         });
 
         if (!response.ok) throw new Error("Failed to load scholars");
-
         const data = await response.json();
-
         allScholars = data.scholars || [];
+        
+        if (filters.penalizedOnly) {
+            allScholars = allScholars.filter(s => s.penalty_hours > 0);
+        }
 
         updateStats(data);
         renderTable(allScholars);
         updateFilterSummary(data, filters);
 
-        if (typeof Chart !== "undefined") {
-            createCharts(data);
-        }
-
-        const now = new Date();
-        document.getElementById(
-            "last-updated"
-        ).textContent = now.toLocaleTimeString();
+        if (typeof Chart !== "undefined") createCharts(data);
+        
+        const lastUpdated = document.getElementById("last-updated");
+        if (lastUpdated) lastUpdated.textContent = new Date().toLocaleTimeString();
     } catch (error) {
-        console.error("JS CRASHED HERE:", error);
-        showError("Failed to load scholars. Please try again.");
+        console.error("Scholar load error:", error);
+        showError("Failed to load scholars. Check your connection.");
     }
 }
 
 function updateFilterSummary(data, filters) {
     const summary = document.getElementById("filter-summary");
-
-    if (!summary) {
-        return;
-    }
+    if (!summary) return;
 
     const activeFilters = [];
-
-    if (filters.status && filters.status !== "all") {
-        activeFilters.push(`status: ${formatStatusLabel(filters.status)}`);
-    }
-
-    if (filters.school && filters.school !== "all") {
-        activeFilters.push(`school: ${filters.school}`);
-    }
-
-    if (filters.search) {
-        activeFilters.push(`search: "${filters.search}"`);
-    }
+    if (filters.status && filters.status !== "all") activeFilters.push(`status: ${formatStatusLabel(filters.status)}`);
+    if (filters.school && filters.school !== "all") activeFilters.push(`school: ${filters.school}`);
+    if (filters.search) activeFilters.push(`search: "${filters.search}"`);
 
     if (activeFilters.length === 0) {
         summary.textContent = `Showing all scholars (${data.total || 0})`;
         return;
     }
-
     summary.textContent = `Showing ${data.total || 0} scholar(s) filtered by ${activeFilters.join(", ")}`;
+}
+
+let activeSemesterId = null;
+let activeSemesterData = null;
+
+function initSemesterManagement() {
+    loadSemesterSettings();
+    initSemesterModal();
+    initProcessPenalties();
+}
+
+async function loadSemesterSettings() {
+    try {
+        const response = await fetch('/api/admin/semester-settings/', {
+            headers: { Authorization: `Bearer ${localStorage.getItem("access")}` },
+        });
+        if (response.ok) {
+            const data = await response.json();
+            const active = data.find(s => s.is_active);
+            const infoDiv = document.getElementById('active-semester-info');
+            const editBtn = document.getElementById('edit-semester-btn');
+
+            if (active && infoDiv) {
+                activeSemesterId = active.id;
+                activeSemesterData = active;
+                
+                const start = new Date(active.start_date).toLocaleDateString();
+                const end = new Date(active.end_date).toLocaleDateString();
+                const deadline = new Date(active.deadline_date).toLocaleDateString();
+
+                infoDiv.innerHTML = `
+                    <div class="flex flex-col gap-1">
+                        <span class="font-bold text-gray-900 text-base">${active.term_name}</span> 
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                            <span>Start: <b class="text-gray-700">${start}</b></span>
+                            <span>End: <b class="text-gray-700">${end}</b></span>
+                            <span class="px-2 py-0.5 bg-rose-50 text-rose-600 rounded border border-rose-100 font-bold uppercase tracking-tight">Penalty Deadline: ${deadline}</span>
+                        </div>
+                    </div>
+                `;
+                if (editBtn) editBtn.classList.remove('hidden');
+            } else if (infoDiv) {
+                infoDiv.textContent = "No active semester set. Please setup a new one.";
+                if (editBtn) editBtn.classList.add('hidden');
+            }
+        }
+    } catch (error) {
+        console.error("Failed to load semester settings:", error);
+    }
+}
+
+function initSemesterModal() {
+    const modal = document.getElementById('semester-modal');
+    const openBtn = document.getElementById('open-semester-modal');
+    const editBtn = document.getElementById('edit-semester-btn');
+    const closeBtn = document.getElementById('close-semester-modal');
+    const form = document.getElementById('semester-form');
+    const modalTitle = document.getElementById('modal-title-text');
+    const idInput = document.getElementById('semester-id');
+
+    if (openBtn && modal) {
+        openBtn.addEventListener("click", () => {
+            if (modalTitle) modalTitle.textContent = "Setup New Semester";
+            if (idInput) idInput.value = "";
+            form.reset();
+            modal.classList.remove('hidden');
+        });
+    }
+
+    if (editBtn && modal) {
+        editBtn.addEventListener("click", () => {
+            if (!activeSemesterData) return;
+            if (modalTitle) modalTitle.textContent = "Edit Active Semester";
+            if (idInput) idInput.value = activeSemesterData.id;
+            
+            form.elements['term_name'].value = activeSemesterData.term_name;
+            form.elements['start_date'].value = activeSemesterData.start_date;
+            form.elements['end_date'].value = activeSemesterData.end_date;
+            form.elements['deadline_date'].value = activeSemesterData.deadline_date;
+            form.elements['is_active'].checked = activeSemesterData.is_active;
+            
+            modal.classList.remove('hidden');
+        });
+    }
+    
+    if (closeBtn && modal) {
+        closeBtn.addEventListener("click", () => modal.classList.add('hidden'));
+    }
+
+    if (form && modal) {
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const sid = formData.get('id');
+            const method = sid ? 'PUT' : 'POST';
+
+            const payload = {
+                term_name: formData.get('term_name'),
+                start_date: formData.get('start_date'),
+                end_date: formData.get('end_date'),
+                deadline_date: formData.get('deadline_date'),
+                is_active: form.elements['is_active'] ? form.elements['is_active'].checked : false
+            };
+
+            if (sid) payload.id = parseInt(sid);
+
+            try {
+                const response = await fetch('/api/admin/semester-settings/', {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        Authorization: `Bearer ${localStorage.getItem("access")}`,
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    modal.classList.add('hidden');
+                    form.reset();
+                    loadSemesterSettings();
+                    alert(sid ? "Semester updated successfully!" : "Semester created successfully!");
+                } else {
+                    const err = await response.json();
+                    alert("Error: " + JSON.stringify(err));
+                }
+            } catch (error) {
+                alert("Request failed.");
+            }
+        });
+    }
+}
+
+function initProcessPenalties() {
+    const btn = document.getElementById('process-deadlines-btn');
+    if (btn) {
+        btn.addEventListener("click", async () => {
+            if (!activeSemesterId) {
+                alert("Please select or create an active semester first.");
+                return;
+            }
+
+            if (!confirm("CRITICAL ACTION: This will evaluate ALL scholars against the deadline. Violators will receive +50 hours penalty and their progress will reset for the new semester. Proceed?")) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/process-penalties/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        Authorization: `Bearer ${localStorage.getItem("access")}`,
+                    },
+                    body: JSON.stringify({ semester_id: activeSemesterId })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    alert(`${data.message}`);
+                    loadScholars(); 
+                    loadPenaltyLogs();
+                    loadSemesterSettings(); // Refresh to show the new auto-created semester
+                } else {
+                    alert(`Action denied: ${data.error || JSON.stringify(data)}`);
+                }
+            } catch (error) {
+                alert("Failed to process penalties.");
+            }
+        });
+    }
+}
+
+/**
+ * Get CSRF token from cookie
+ */
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 
 function createMiniProgress(percentage) {
@@ -180,13 +344,19 @@ function renderTable(scholars) {
         const status = getStatusByKey(scholar.status || getStatusKey(percentage));
 
         const row = document.createElement("tr");
-        row.className = "hover:bg-gray-50 transition";
+        const hasPenalty = scholar.penalty_hours > 0;
+        
+        row.className = `hover:bg-gray-50 transition ${hasPenalty ? 'bg-rose-50' : ''}`;
         row.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                ${scholar.student_id}
+                <div class="flex items-center gap-2">
+                    ${hasPenalty ? '<span class="flex h-2 w-2 rounded-full bg-rose-600 animate-pulse" title="Penalized"></span>' : ''}
+                    ${scholar.student_id}
+                </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 ${scholar.name}
+                ${hasPenalty ? `<div class="text-[10px] font-bold text-rose-600">INCLUDES +${scholar.penalty_hours}h PENALTY</div>` : ''}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 ${scholar.school_display || "Not Set"}
@@ -198,7 +368,9 @@ function renderTable(scholars) {
                 ${createMiniProgress(percentage)}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                ${scholar.rendered_hours}/${scholar.required_hours}
+                <span class="${hasPenalty ? 'text-rose-600 font-bold' : ''}">
+                    ${scholar.rendered_hours}/${scholar.required_hours}
+                </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
                 <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -208,15 +380,124 @@ function renderTable(scholars) {
                 </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm">
-                <button onclick="viewScholarDetails('${scholar.student_id}')" 
-                        class="text-blue-600 hover:text-blue-900 font-medium">
-                    View Details
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="viewScholarDetails('${scholar.student_id}')" 
+                            class="text-blue-600 hover:text-blue-900 font-medium">
+                        View
+                    </button>
+                </div>
             </td>
         `;
 
         tbody.appendChild(row);
     });
+}
+
+async function loadPenaltyLogs() {
+    const tbody = document.getElementById('penalty-log-table');
+    if (!tbody) return;
+
+    try {
+        const response = await fetch('/api/penalties/', {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("access")}`,
+            },
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500 text-sm">No penalties issued yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.forEach(log => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition';
+                
+                let actionButtons = '';
+                if (log.status === 'ACTIVE') {
+                    actionButtons = `
+                        <div class="flex gap-2">
+                            <button onclick="updatePenaltyStatus(${log.id}, 'WAIVED')" 
+                                    class="text-gray-600 hover:text-gray-900 text-xs font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                                Waive
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    actionButtons = '<span class="text-xs text-gray-400 italic">No actions</span>';
+                }
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${new Date(log.created_at).toLocaleDateString()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ${log.scholar_name || 'Scholar'}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="${log.reason}">
+                        ${log.reason}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-rose-600 font-bold">
+                        +${log.hours_added}h
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${getStatusClasses(log.status)}">
+                            ${log.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${actionButtons}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        } else {
+             tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-rose-500 text-sm">Failed to load penalties. Server error.</td></tr>';
+        }
+    } catch (error) {
+        console.error("Failed to load penalty logs:", error);
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-rose-500 text-sm">Network error while loading penalties.</td></tr>';
+    }
+}
+
+function getStatusClasses(status) {
+    switch(status) {
+        case 'ACTIVE': return 'bg-orange-100 text-orange-800';
+        case 'RESOLVED': return 'bg-green-100 text-green-800';
+        case 'WAIVED': return 'bg-gray-100 text-gray-800';
+        default: return 'bg-blue-100 text-blue-800';
+    }
+}
+
+async function updatePenaltyStatus(penaltyId, newStatus) {
+    if (!confirm(`Are you sure you want to change this penalty to ${newStatus}?`)) return;
+
+    try {
+        const response = await fetch(`/api/penalties/${penaltyId}/`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+                Authorization: `Bearer ${localStorage.getItem("access")}`,
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+
+        if (response.ok) {
+            alert(`Penalty marked as ${newStatus}`);
+            loadPenaltyLogs();
+            loadScholars(); // Refresh scholars as their hours will have changed!
+        } else {
+            const err = await response.json();
+            alert("Failed to update: " + (err.error || JSON.stringify(err)));
+        }
+    } catch (error) {
+        console.error("Error updating penalty status:", error);
+        alert("An error occurred while updating status.");
+    }
 }
 
 function applyFilters() {

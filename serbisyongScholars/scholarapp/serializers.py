@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
-from .models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty, SemesterSettings
 from datetime import date
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -166,29 +166,84 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 class VoucherSerializer(serializers.ModelSerializer):
     is_available = serializers.BooleanField(read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    office_name = serializers.CharField(source='office.name', read_only=True)
+    scholar_application_status = serializers.SerializerMethodField()
+
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+
+    def get_created_by_name(self, obj):
+        user = obj.created_by
+        if not user:
+            return "System"
+        name = user.get_full_name() or user.username
+        if user.role == 'ADMIN':
+            return f"Admin {name} - OAA"
+        elif user.role == 'MODERATOR':
+            office = getattr(user, 'assigned_office', None) or "Moderator"
+            return f"{name} - {office}"
+        return name
+
+    def get_scholar_application_status(self, obj):
+        """Get the current scholar's application status for this voucher (if scholar)."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        
+        # Only scholars get this info; others get None
+        if request.user.role != 'SCHOLAR':
+            return None
+        
+        # Find if scholar has applied to this voucher
+        app = VoucherApplication.objects.filter(
+            voucher=obj,
+            scholar=request.user
+        ).values_list('status', flat=True).first()
+        
+        return app
+
+    def validate_expiry_date(self, value):
+        if value < date.today():
+            raise serializers.ValidationError('Expiry date cannot be yesterday or in the past.')
+        return value
     
     class Meta:
         model = Voucher
         fields = [
-            'id', 'title', 'description', 'category', 'provider',
-            'total_slots', 'remaining_slots', 'status', 'expiry_date',
-            'created_at', 'created_by_name', 'image_url', 'is_available'
+            'id', 'title', 'description', 'category', 'provider', 'office', 'office_name',
+            'total_slots', 'remaining_slots', 'status', 'status_display', 'rejection_reason', 'expiry_date',
+            'created_at', 'created_by_name', 'created_by_username', 'image_url', 'is_available', 'scholar_application_status'
         ]
-        read_only_fields = ['remaining_slots', 'created_by']
+        read_only_fields = ['remaining_slots', 'created_by', 'status', 'rejection_reason', 'office', 'scholar_application_status']
 
 
 class VoucherApplicationSerializer(serializers.ModelSerializer):
     voucher_title = serializers.CharField(source='voucher.title', read_only=True)
     voucher_category = serializers.CharField(source='voucher.category', read_only=True)
     voucher_expiry_date = serializers.DateField(source='voucher.expiry_date', read_only=True)
+    voucher_created_by_name = serializers.SerializerMethodField()
+    voucher_created_by_username = serializers.CharField(source='voucher.created_by.username', read_only=True)
     scholar_name = serializers.CharField(source='scholar.get_full_name', read_only=True)
     scholar_id = serializers.CharField(source='scholar.scholar_profile.student_id', read_only=True)
+
+    def get_voucher_created_by_name(self, obj):
+        user = obj.voucher.created_by
+        if not user:
+            return "System"
+        name = user.get_full_name() or user.username
+        if user.role == 'ADMIN':
+            return f"Admin {name} - OAA"
+        elif user.role == 'MODERATOR':
+            office = getattr(user, 'assigned_office', None) or "Moderator"
+            return f"{name} - {office}"
+        return name
 
     class Meta:
         model = VoucherApplication
         fields = [
             'id', 'voucher', 'voucher_title', 'voucher_category', 'voucher_expiry_date',
+            'voucher_created_by_name', 'voucher_created_by_username',
             'scholar', 'scholar_name', 'scholar_id', 'applied_at', 'status', 'notes', 'admin_notes'
         ]
         read_only_fields = ['scholar', 'applied_at', 'status']
@@ -197,14 +252,26 @@ class VoucherApplicationSerializer(serializers.ModelSerializer):
 class PenaltySerializer(serializers.ModelSerializer):
     scholar_name = serializers.CharField(source='scholar.get_full_name', read_only=True)
     scholar_username = serializers.CharField(source='scholar.username', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    semester_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Penalty
         fields = [
             'id', 'scholar', 'scholar_name', 'scholar_username',
-            'reason', 'status', 'status_display',
+            'reason', 'status', 'status_display', 'hours_added', 'semester', 'semester_name',
             'created_by', 'created_by_name', 'created_at', 'updated_at', 'notes'
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at']
+
+    def get_semester_name(self, obj):
+        return obj.semester.term_name if obj.semester else "N/A"
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() if obj.created_by else "System"
+
+class SemesterSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SemesterSettings
+        fields = '__all__'

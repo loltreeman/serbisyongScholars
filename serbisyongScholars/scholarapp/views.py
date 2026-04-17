@@ -1,31 +1,33 @@
+# pyright: reportAttributeAccessIssue=false, reportGeneralTypeIssues=false, reportOptionalMemberAccess=false, reportArgumentType=false, reportIndexIssue=false, reportOperatorIssue=false
 import threading
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
 from django.contrib.auth.decorators import login_required
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.core.mail import send_mail
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.views.decorators.csrf import csrf_exempt
+from django.db import models, transaction, IntegrityError
 from django.conf import settings
 from django.shortcuts import render, redirect
-from .serializers import RegistrationSerializer, ServiceLogSerializer, AnnouncementSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.db.models import Avg, Q, Sum
-from .models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty
-from .serializers import VoucherSerializer, VoucherApplicationSerializer, PenaltySerializer
-from django.http import JsonResponse
-from datetime import date
-from django.db.models import Q
+from django.db.models import Avg, Q, Sum, F
+from datetime import date, timedelta
+
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty, SemesterSettings
+from scholarapp.serializers import (
+    RegistrationSerializer, ServiceLogSerializer, AnnouncementSerializer,
+    VoucherSerializer, VoucherApplicationSerializer, PenaltySerializer, SemesterSettingsSerializer
+)
 
 
 User = get_user_model()
@@ -187,6 +189,34 @@ def is_oaa_mod(user):
     return 'oaa' in office or 'admission and aid' in office
 
 
+def reconcile_expired_voucher_state():
+    """Expire vouchers and auto-decline pending applications for expired vouchers."""
+    today = date.today()
+
+    Voucher.objects.filter(expiry_date__lt=today)\
+        .exclude(status__in=['EXPIRED', 'PENDING', 'REJECTED'])\
+        .update(status='EXPIRED')
+
+    pending_apps = VoucherApplication.objects.select_related('voucher').filter(
+        status='PENDING',
+        voucher__expiry_date__lt=today,
+    )
+
+    restored_slots = {}
+    for application in pending_apps:
+        application.status = 'REJECTED'
+        application.admin_notes = 'Auto-declined because the voucher expired.'
+        application.save(update_fields=['status', 'admin_notes'])
+
+        restored_slots[application.voucher_id] = restored_slots.get(application.voucher_id, 0) + 1
+
+    for voucher_id, restore_count in restored_slots.items():
+        voucher = Voucher.objects.get(id=voucher_id)
+        voucher.remaining_slots = min(voucher.total_slots, voucher.remaining_slots + restore_count)
+        voucher.status = 'EXPIRED'
+        voucher.save(update_fields=['remaining_slots', 'status'])
+
+
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         # Handle Email login by finding the actual username
@@ -222,7 +252,7 @@ class MyTokenObtainPairView(TokenObtainPairView):
         if login_id and '@' in login_id:
             try:
                 user_obj = User.objects.get(email__iexact=login_id)
-                request.data['username'] = user_obj.username
+                request.data['username'] = user_obj.username  # type: ignore
             except User.DoesNotExist:
                 pass
 
@@ -469,8 +499,9 @@ def admin_scholars_list(request):
             'rendered_hours': rendered,
             'required_hours': required,
             'carry_over': profile.carry_over_hours,
+            'penalty_hours': profile.penalty_hours,
             'status': status
-    })
+        })
     
     # Calculate stats
     total_scholars = len(scholars)
@@ -521,49 +552,41 @@ def user_profile(request):
     if request.method == 'GET':
         username = request.GET.get('username')
         student_id = request.GET.get('student_id')
+        me = request.GET.get('me') == 'true'
         
-        if not username and not student_id:
-            return Response({'error': 'Please provide a username or student_id.'}, status=400)
+        if not username and not student_id and not me:
+            return Response({'error': 'Please provide a username, student_id, or me=true.'}, status=400)
 
         try:
-            if student_id:
-                # Find user by student_id
+            if me:
+                user = request.user
+            elif student_id:
                 scholar_profile = ScholarProfile.objects.select_related('user').get(student_id=student_id)
                 user = scholar_profile.user
             else:
-                # Find user by username
                 user = User.objects.get(username=username)
-        except ScholarProfile.DoesNotExist:
-            return Response({'error': 'Scholar not found'}, status=404)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=404)
-    else:  # PUT
-        username = request.data.get('username')
-        if not username:
-            return Response({'error': 'Please provide a username.'}, status=400)
-        
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
+        except (ScholarProfile.DoesNotExist, User.DoesNotExist):
             return Response({'error': 'User not found'}, status=404)
 
-    scholar = getattr(user, 'scholar_profile', None)
-    moderator = getattr(user, 'moderator_profile', None)
+        scholar = getattr(user, 'scholar_profile', None)
+        moderator = getattr(user, 'moderator_profile', None)
 
-    if request.method == 'GET':
         data = {
             'username': user.username,
-            'name': f"{user.first_name} {user.last_name}",
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'name': user.get_full_name() or user.username,
             'email': user.email,
             'role': user.role,
             'student_id': getattr(scholar, 'student_id', None),
+            'school': getattr(scholar, 'school', None),
             'course_department': getattr(scholar, 'program_course', None),
             'grant_type': getattr(scholar, 'scholar_grant', None),
             'total_hours_rendered': getattr(scholar, 'total_hours_rendered', 0),
             'required_hours': getattr(scholar, 'required_hours', 10),
             'carry_over_hours': getattr(scholar, 'carry_over_hours', 0),
             'is_dormer': getattr(scholar, 'is_dormer', False),
-            'assigned_office': getattr(moderator, 'office_name', None),
+            'office_name': getattr(moderator, 'office_name', None),
             'service_logs': []
         }
 
@@ -586,30 +609,81 @@ def user_profile(request):
     if not request.user.is_authenticated:
         return Response({'error': 'Authentication required to update profile.'}, status=401)
 
-    payload = request.data
-    updated = False
-    
-    if 'role' in payload:
-        if request.user.role != 'ADMIN':
-            return Response({'error': 'Admin access required to change role.'}, status=403)
-        new_role = payload.get('role')
-        if new_role in dict(User.ROLE_CHOICES):
-            user.role = new_role
-            updated = True
-            
-    if 'first_name' in payload and request.user == user:
-        user.first_name = payload.get('first_name')
-        updated = True
-        
-    if 'last_name' in payload and request.user == user:
-        user.last_name = payload.get('last_name')
-        updated = True
+    username_param = request.data.get('username')
+    if not username_param:
+        return Response({'error': 'Please provide a username.'}, status=400)
 
-    if updated:
+    try:
+        user = User.objects.get(username=username_param)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
+
+    # Only self can edit own profile, or an Admin can edit anyone
+    is_self = request.user == user
+    is_admin = request.user.role == 'ADMIN'
+
+    if not is_self and not is_admin:
+        return Response({'error': 'Permission denied.'}, status=403)
+
+    scholar = getattr(user, 'scholar_profile', None)
+    payload = request.data
+    user_updated = False
+    scholar_updated = False
+
+    # --- Fields always editable by self OR admin ---
+    if 'first_name' in payload:
+        user.first_name = payload.get('first_name')
+        user_updated = True
+    if 'last_name' in payload:
+        user.last_name = payload.get('last_name')
+        user_updated = True
+    if 'email' in payload and is_admin:
+        # Email only editable by admin
+        user.email = payload.get('email')
+        user_updated = True
+
+    # Username change (Now allowed by self OR admin)
+    new_username = payload.get('new_username', '').strip()
+    if new_username and new_username != user.username:
+        if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
+            return Response({'error': 'That username is already taken.'}, status=400)
+        user.username = new_username
+        user_updated = True
+
+    # --- Admin-only fields ---
+    if is_admin:
+        if 'role' in payload:
+            new_role = payload.get('role')
+            if new_role in dict(User.ROLE_CHOICES):
+                user.role = new_role
+                user_updated = True
+        if 'grant_type' in payload and scholar:
+            scholar.scholar_grant = payload.get('grant_type')
+            scholar_updated = True
+
+    # --- Scholar fields: editable by self (if scholar) OR admin ---
+    if scholar:
+        if 'school' in payload:
+            new_school = payload.get('school')
+            if new_school in [c[0] for c in ScholarProfile.SCHOOL_CHOICES]:
+                scholar.school = new_school
+                scholar_updated = True
+        if 'program_course' in payload:
+            scholar.course_department = payload.get('program_course')
+            scholar_updated = True
+        if 'year_level' in payload:
+            scholar.year_level = payload.get('year_level')
+            scholar_updated = True
+
+    if user_updated:
         user.save()
+    if scholar_updated:
+        scholar.save()
+
+    if user_updated or scholar_updated:
         return Response({'message': 'Profile updated successfully.'})
     else:
-        return Response({'message': 'No changes made.'}, status=400)
+        return Response({'message': 'No changes detected.'}, status=200)
 
 @login_required(login_url='/login/')
 def profile_page(request):
@@ -852,6 +926,7 @@ def approve_announcement(request, announcement_id):
     else:
         return Response({'error': 'Invalid action'}, status=400)
   
+@login_required(login_url='/login/')
 def announcements_page(request):
     """Render announcements page"""
     return render(request, 'announcements.html', {
@@ -990,38 +1065,81 @@ def vouchers_list(request):
     GET: List all active vouchers
     POST: Create voucher (ADMIN only)
     """
+    reconcile_expired_voucher_state()
+
     if request.method == 'GET':
-        # Scholars see only active, available vouchers
-        # Admins see all vouchers
-        if request.user.role == 'ADMIN':
-            vouchers = Voucher.objects.all()
-        else:
+        user = request.user
+        role = get_effective_role(user)
+
+        # Scholars see only active/full/expired but NOT pending or rejected
+        # Scholars see only active vouchers that haven't expired and have slots
+        if role == 'SCHOLAR':
             vouchers = Voucher.objects.filter(
-                status='ACTIVE',
+                status='ACTIVE', 
                 expiry_date__gte=date.today(),
                 remaining_slots__gt=0
             )
+        # Admins see all
+        elif role == 'ADMIN':
+            vouchers = Voucher.objects.all()
+        # Moderators see active vouchers in their office + their own pending/rejected ones
+        else:
+            try:
+                moderator_office = user.moderator_profile.office
+                if moderator_office:
+                    vouchers = Voucher.objects.filter(
+                        Q(office=moderator_office, status__in=['ACTIVE', 'FULL', 'EXPIRED']) | 
+                        Q(created_by=user)
+                    )
+                else:
+                    # If moderator has no office assigned, only see their own vouchers
+                    vouchers = Voucher.objects.filter(created_by=user)
+            except:
+                # If moderator_profile doesn't exist, only see own vouchers
+                vouchers = Voucher.objects.filter(created_by=user)
         
         # Filter by category if provided
         category = request.GET.get('category')
         if category:
             vouchers = vouchers.filter(category=category)
         
-        serializer = VoucherSerializer(vouchers, many=True)
+        # Filter by status if provided (for history/admin views)
+        status_filter = request.GET.get('status')
+        if status_filter:
+            vouchers = vouchers.filter(status=status_filter)
+        
+        serializer = VoucherSerializer(
+            vouchers.distinct(), 
+            many=True,
+            context={'request': request}
+        )
         return Response(serializer.data)
     
     elif request.method == 'POST':
-        # Only ADMIN or OAA moderators can create vouchers
-        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
-            return Response({'error': 'Only OAA moderators and admins can create vouchers'}, status=403)
+        # Only ADMIN or any MODERATOR can create vouchers
+        if not (request.user.role == 'ADMIN' or request.user.role == 'MODERATOR'):
+            return Response({'error': 'Only moderators and admins can create vouchers'}, status=403)
         
         serializer = VoucherSerializer(data=request.data)
         if serializer.is_valid():
-            # Set remaining_slots = total_slots initially
             total_slots = serializer.validated_data.get('total_slots')
+            
+            # Admins create active vouchers; Moderators create pending ones
+            initial_status = 'ACTIVE' if request.user.role == 'ADMIN' else 'PENDING'
+            
+            # Get moderator's office if they are a moderator
+            office = None
+            if request.user.role == 'MODERATOR':
+                try:
+                    office = request.user.moderator_profile.office
+                except:
+                    pass
+            
             serializer.save(
                 created_by=request.user,
-                remaining_slots=total_slots
+                remaining_slots=total_slots,
+                status=initial_status,
+                office=office
             )
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
@@ -1032,34 +1150,133 @@ def vouchers_list(request):
 def voucher_detail(request, voucher_id):
     """
     GET: Get voucher details
-    PUT: Update voucher (ADMIN only)
-    DELETE: Delete voucher (ADMIN only)
+    PUT: Update voucher
+    DELETE: Delete voucher
     """
+    reconcile_expired_voucher_state()
+
     try:
         voucher = Voucher.objects.get(id=voucher_id)
     except Voucher.DoesNotExist:
         return Response({'error': 'Voucher not found'}, status=404)
     
+    user = request.user
+    role = get_effective_role(user)
+
     if request.method == 'GET':
         serializer = VoucherSerializer(voucher)
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
-            return Response({'error': 'Only OAA moderators and admins can edit vouchers'}, status=403)
+        # Admin can edit always; creator (mod) can edit if 0 approved apps
+        if role == 'ADMIN':
+            pass
+        elif role == 'MODERATOR' and voucher.created_by == user:
+            approved_count = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').count()
+            if approved_count > 0:
+                return Response({'error': 'You cannot edit a voucher that already has approved applications. Please contact an admin.'}, status=403)
+        else:
+            return Response({'error': 'Unauthorized to edit this voucher'}, status=403)
+
+        force = request.data.get('force') == True
+        new_total_slots = request.data.get('total_slots')
+
+        if new_total_slots is not None:
+            new_total_slots = int(new_total_slots)
+            approved_count = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').count()
+            
+            if new_total_slots < approved_count:
+                if not force:
+                    return Response({
+                        'error': f'Reducing slots to {new_total_slots} will require rejecting {approved_count - new_total_slots} already approved applications.',
+                        'requires_confirmation': True,
+                        'conflict_type': 'SLOT_REDUCTION',
+                        'approved_count': approved_count
+                    }, status=409)
+                else:
+                    # Auto-reject excess approved (oldest first)
+                    excess = approved_count - new_total_slots
+                    to_reject = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').order_by('applied_at')[:excess]
+                    count = 0
+                    for app in to_reject:
+                        app.status = 'REJECTED'
+                        app.admin_notes = 'Auto-rejected due to voucher slot reduction.'
+                        app.save()
+                        count += 1
+                    
+                    # Update remaining slots logic: total_slots - approved - pending
+                    # But simpler: we just set total_slots, and in the next step serializer.save() will handle it.
+                    # Wait, the serializer.save() might not update remaining_slots automatically if it's not custom logic.
+                    # Actually, we should recalculate remaining_slots.
+                    pass
 
         serializer = VoucherSerializer(voucher, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            # If total_slots changed, we MUST update remaining_slots
+            if 'total_slots' in serializer.validated_data:
+                old_total = voucher.total_slots
+                new_total = serializer.validated_data['total_slots']  # type: ignore
+                diff = new_total - old_total
+                # Note: this ignores pending apps for simplicity, matching the existing apply logic 
+                # where remaining_slots = total_slots - (all applications created).
+                # Wait, the current apply logic decrements on creation. So:
+                # new_remaining = current_remaining + diff
+                serializer.save(remaining_slots=max(0, voucher.remaining_slots + diff))
+            else:
+                serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
 
     elif request.method == 'DELETE':
-        if not (request.user.role == 'ADMIN' or is_oaa_mod(request.user)):
-            return Response({'error': 'Only OAA moderators and admins can delete vouchers'}, status=403)
+        # ADMIN can delete any voucher; MODERATOR can only delete their own pending vouchers
+        can_delete = request.user.role == 'ADMIN' or (request.user == voucher.created_by and voucher.status == 'PENDING')
+        if not can_delete:
+            return Response({'error': 'Not authorized to delete this voucher'}, status=403)
         
+        force = request.query_params.get('force') == 'true'
+        pending_count = VoucherApplication.objects.filter(voucher=voucher, status='PENDING').count()
+        approved_count = VoucherApplication.objects.filter(voucher=voucher, status='APPROVED').count()
+
+        if (pending_count > 0 or approved_count > 0) and not force:
+            return Response({
+                'error': f'This voucher has {pending_count} pending and {approved_count} approved applications.',
+                'requires_confirmation': True,
+                'pending_count': pending_count,
+                'approved_count': approved_count
+            }, status=409)
+            
         voucher.delete()
-        return Response({'message': 'Voucher deleted successfully'}, status=200)
+        return Response({'message': 'Voucher and all linked applications deleted successfully'}, status=200)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def voucher_approve(request, voucher_id):
+    """
+    Approve or reject a moderator-submitted voucher (ADMIN only)
+    """
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Only admins can approve/reject vouchers'}, status=403)
+    
+    try:
+        voucher = Voucher.objects.get(id=voucher_id)
+    except Voucher.DoesNotExist:
+        return Response({'error': 'Voucher not found'}, status=404)
+    
+    action = request.data.get('action') # 'approve' or 'reject'
+    reason = request.data.get('rejection_reason', '')
+
+    if action == 'approve':
+        voucher.status = 'ACTIVE'
+        voucher.rejection_reason = None
+    elif action == 'reject':
+        voucher.status = 'REJECTED'
+        voucher.rejection_reason = reason
+    else:
+        return Response({'error': 'Invalid action'}, status=400)
+    
+    voucher.save()
+    return Response({'message': f'Voucher {action}d successfully'})
 
 
 @api_view(['POST'])
@@ -1068,6 +1285,8 @@ def apply_voucher(request, voucher_id):
     """
     Scholar applies for a voucher
     """
+    reconcile_expired_voucher_state()
+
     if request.user.role != 'SCHOLAR':
         return Response({'error': 'Only scholars can apply for vouchers'}, status=403)
     
@@ -1095,17 +1314,20 @@ def apply_voucher(request, voucher_id):
     # Create application
     notes = request.data.get('notes', '')
     
-    application = VoucherApplication.objects.create(
-        voucher=voucher,
-        scholar=request.user,
-        notes=notes,
-        status='PENDING'
-    )
+    try:
+        application = VoucherApplication.objects.create(
+            voucher=voucher,
+            scholar=request.user,
+            notes=notes,
+            status='PENDING'
+        )
+    except IntegrityError:
+        return Response({'error': 'You have already applied for this voucher (request busy)'}, status=400)
     
-    # Decrement remaining slots
-    voucher.remaining_slots -= 1
-    if voucher.remaining_slots == 0:
-        voucher.status = 'FULL'
+    return Response({'message': 'Application submitted successfully'}, status=201)
+    
+    # Slot decrement is now handled on APPROVAL, not on application
+    # to avoid slot leakage from rejected/pending applications.
     voucher.save()
     
     serializer = VoucherApplicationSerializer(application)
@@ -1118,6 +1340,8 @@ def my_voucher_applications(request):
     """
     Get current scholar's voucher applications
     """
+    reconcile_expired_voucher_state()
+
     if request.user.role != 'SCHOLAR':
         return Response({'error': 'Scholars only'}, status=403)
     
@@ -1135,17 +1359,24 @@ def voucher_applications_list(request):
     - Other mods: see only applications for vouchers they created or
       whose provider matches their office name.
     """
+    reconcile_expired_voucher_state()
+
     user = request.user
 
-    if user.role == 'ADMIN' or is_oaa_mod(user):
+    if user.role == 'ADMIN':
         applications = VoucherApplication.objects.all()
     elif user.role == 'MODERATOR':
         try:
-            office = user.moderator_profile.office_name
-            applications = VoucherApplication.objects.filter(
-                Q(voucher__created_by=user) |
-                Q(voucher__provider__icontains=office)
-            )
+            moderator_office = user.moderator_profile.office
+            if moderator_office:
+                # Moderators see applications for vouchers they created or vouchers in their office
+                applications = VoucherApplication.objects.filter(
+                    Q(voucher__created_by=user) |
+                    Q(voucher__office=moderator_office)
+                )
+            else:
+                # If moderator has no office, only see own applications
+                applications = VoucherApplication.objects.filter(voucher__created_by=user)
         except Exception:
             applications = VoucherApplication.objects.none()
     else:
@@ -1172,6 +1403,8 @@ def approve_voucher_application(request, application_id):
     Approve or reject a voucher application.
     Allowed: Admin, OAA moderators, or the moderator who created the voucher.
     """
+    reconcile_expired_voucher_state()
+
     try:
         application = VoucherApplication.objects.get(id=application_id)
     except VoucherApplication.DoesNotExist:
@@ -1180,7 +1413,6 @@ def approve_voucher_application(request, application_id):
     user = request.user
     can_approve = (
         user.role == 'ADMIN' or
-        is_oaa_mod(user) or
         (user.role == 'MODERATOR' and application.voucher.created_by == user)
     )
     if not can_approve:
@@ -1190,22 +1422,39 @@ def approve_voucher_application(request, application_id):
     admin_notes = request.data.get('admin_notes', '')
     
     if action == 'approve':
+        # Check if slots are still available at approval time
+        if application.voucher.remaining_slots <= 0:
+            return Response({'error': 'No more slots available for this voucher'}, status=400)
+            
         application.status = 'APPROVED'
         application.admin_notes = admin_notes
         application.save()
+        
+        # Decrement slot on APPROVAL using atomic F expression
+        voucher = application.voucher
+        voucher.remaining_slots = F('remaining_slots') - 1
+        voucher.save()
+        
+        # Refresh from DB to check if we hit zero for status update
+        voucher.refresh_from_db()
+        if voucher.remaining_slots <= 0:
+            voucher.status = 'FULL'
+            voucher.save()
+        
         return Response({'message': 'Application approved'}, status=200)
     
     elif action == 'reject':
+        # If it was previously approved, return the slot
+        if application.status == 'APPROVED':
+            voucher = application.voucher
+            voucher.remaining_slots += 1
+            if voucher.status == 'FULL':
+                voucher.status = 'ACTIVE'
+            voucher.save()
+        
         application.status = 'REJECTED'
         application.admin_notes = admin_notes
         application.save()
-        
-        # Return slot to voucher
-        voucher = application.voucher
-        voucher.remaining_slots += 1
-        if voucher.status == 'FULL':
-            voucher.status = 'ACTIVE'
-        voucher.save()
         
         return Response({'message': 'Application rejected'}, status=200)
     
@@ -1215,17 +1464,13 @@ def approve_voucher_application(request, application_id):
 @login_required
 def vouchers_page(request):
     user = request.user
-    can_create = user.role == 'ADMIN' or is_oaa_mod(user)
+    can_create = user.role in ('ADMIN', 'MODERATOR')
     can_manage = user.role in ('ADMIN', 'MODERATOR')
-
-    # Non-OAA mods can see applications for their office but not approve them
-    is_readonly_mod = user.role == 'MODERATOR' and not is_oaa_mod(user)
 
     return render(request, 'vouchers.html', {
         'can_create_voucher': can_create,
         'can_manage_applications': can_manage,
-        'is_oaa_mod': is_oaa_mod(user),
-        'is_readonly_mod': is_readonly_mod,
+        'current_username': user.username,
     })
 
 
@@ -1279,3 +1524,122 @@ def penalty_detail(request, penalty_id):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+
+@api_view(['GET', 'POST', 'PUT'])
+@permission_classes([IsAuthenticated])
+def semester_settings_api(request):
+    """Admin-only view to manage semester dates and active status."""
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin only'}, status=403)
+
+    if request.method == 'GET':
+        settings = SemesterSettings.objects.all()
+        serializer = SemesterSettingsSerializer(settings, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = SemesterSettingsSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+    elif request.method == 'PUT':
+        # Updates the active semester (assume ID passed in data or just update the active one)
+        setting_id = request.data.get('id')
+        try:
+            setting = SemesterSettings.objects.get(id=setting_id)
+        except SemesterSettings.DoesNotExist:
+            return Response({'error': 'Semester setting not found'}, status=404)
+        
+        serializer = SemesterSettingsSerializer(setting, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def process_penalties(request):
+    """
+    Admin-only view to process penalties for scholars who missed the deadline.
+    Adds 50 hours to penalty_hours and resets total_hours_rendered.
+    """
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin only'}, status=403)
+
+    semester_id = request.data.get('semester_id')
+    try:
+        semester = SemesterSettings.objects.get(id=semester_id)
+    except SemesterSettings.DoesNotExist:
+        return Response({'error': 'Active semester not found'}, status=404)
+
+    # Check if we are at or past the deadline
+    today = date.today()
+    if today < semester.deadline_date:
+         return Response({'error': f'Cannot process penalties before the deadline ({semester.deadline_date})'}, status=400)
+
+    if semester.penalties_processed:
+        return Response({'error': f'Penalties for {semester.term_name} have already been processed.'}, status=400)
+
+    # Find violators: scholars whose total_hours_rendered < required_hours
+    # We filter by role='SCHOLAR' to be safe
+    violators = ScholarProfile.objects.filter(
+        user__role='SCHOLAR',
+        total_hours_rendered__lt=F('required_hours')
+    )
+
+    penalty_count = 0
+    with threading.Lock(): # Simple concurrency protection for bulk update
+        for profile in violators:
+            # Calculate exactly how many required hours they missed rendering
+            missing_hours = profile.required_hours - profile.total_hours_rendered
+            if missing_hours < 0:
+                missing_hours = 0.0
+
+            # 1. Create Penalty record
+            Penalty.objects.create(
+                scholar=profile.user,
+                reason=f"Failed to meet service hours for {semester.term_name}. Deadline: {semester.deadline_date}. Missing: {missing_hours}h",
+                hours_added=50.0 + missing_hours,
+                semester=semester,
+                created_by=request.user,
+                status='ACTIVE'
+            )
+
+            # 2. Reset rendering for NEW semester
+            # The penalty hours are now handled automatically by Penalty.save()
+            profile.total_hours_rendered = 0.0
+            profile.save() 
+            penalty_count += 1
+        
+        # Mark semester as processed
+        semester.penalties_processed = True
+        semester.save()
+
+        # 3. Auto-create NEXT Semester
+        new_start = semester.end_date + timedelta(days=1)
+        if new_start < today:
+             new_start = today
+             
+        new_end = new_start + timedelta(days=150) # Approx 5 months
+        new_deadline = new_end - timedelta(days=14) # 2 weeks before end
+        
+        # Determine next term name if possible, else generic
+        next_term_name = f"Next Semester (Auto-created from {semester.term_name})"
+        
+        SemesterSettings.objects.create(
+            term_name=next_term_name,
+            start_date=new_start,
+            end_date=new_end,
+            deadline_date=new_deadline,
+            is_active=True # This will deactivate the current one automatically via model save() logic
+        )
+
+    return Response({
+        'message': f'Successfully processed penalties for {penalty_count} scholars. A new semester has been created.',
+        'semester': semester.term_name,
+        'count': penalty_count
+    })

@@ -31,13 +31,19 @@ class User(AbstractUser):
 
     @property
     def effective_role(self):
-        # role is the single source of truth — no profile fallback
-        return self.role
+        if self.role in ('ADMIN', 'MODERATOR'):
+            return self.role
+
+        try:
+            self.moderator_profile  # type: ignore
+            return 'MODERATOR'
+        except ObjectDoesNotExist:
+            return self.role
 
     @property
     def assigned_office(self):
         try:
-            return self.moderator_profile.office_name
+            return self.moderator_profile.office_name  # type: ignore
         except ObjectDoesNotExist:
             return None
 
@@ -55,6 +61,7 @@ class ScholarProfile(models.Model):
     required_hours = models.FloatField(validators=[MinValueValidator(0.0)], blank=True)
     total_hours_rendered = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
     carry_over_hours = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
+    penalty_hours = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
 
 
     SCHOOL_CHOICES = [
@@ -78,10 +85,7 @@ class ScholarProfile(models.Model):
     def save(self, *args, **kwargs):
         
         # Dormer logic
-        if self.is_dormer:
-            self.required_hours = 15.0
-        else:
-            self.required_hours = 10.0
+        self.required_hours = (15.0 if self.is_dormer else 10.0) + self.penalty_hours
 
         # Carry over calculation
         if ((self.total_hours_rendered-self.required_hours) >= 0):
@@ -94,14 +98,16 @@ class ScholarProfile(models.Model):
 class ModeratorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='moderator_profile')
     office_name = models.CharField(max_length=200) # Matches the office_name format in ServiceLog
+    office = models.ForeignKey(Office, on_delete=models.PROTECT, related_name='moderators', null=True, blank=True)
 
     class Meta:
         indexes = [
             models.Index(fields=['user']),
+            models.Index(fields=['office']),
         ]
 
     def __str__(self):
-        return f"Moderator: {self.user.username}"
+        return f"Moderator: {self.user.username} ({self.office.name if self.office else 'Unassigned'})"
     
 class ServiceLog(models.Model):
     scholar = models.ForeignKey(ScholarProfile, on_delete=models.CASCADE, related_name='service_logs', db_index=True)
@@ -132,16 +138,38 @@ class ServiceLog(models.Model):
         self.clean()
         super().save(*args, **kwargs)
 
-        # Recalculate total hours atomically
-        total = ServiceLog.objects.filter(scholar=self.scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+        # Recalculate total hours atomically for the ACTIVE semester
+        from scholarapp.models import SemesterSettings
+        active_term = SemesterSettings.objects.filter(is_active=True).first()
+        
+        if active_term:
+            total = ServiceLog.objects.filter(
+                scholar=self.scholar,
+                date_rendered__gte=active_term.start_date,
+                date_rendered__lte=active_term.end_date
+            ).aggregate(Sum('hours'))['hours__sum'] or 0
+        else:
+            total = ServiceLog.objects.filter(scholar=self.scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+            
         ScholarProfile.objects.filter(pk=self.scholar.pk).update(total_hours_rendered=total)
 
     def delete(self, *args, **kwargs):
         scholar = self.scholar
         super().delete(*args, **kwargs)
 
-        # Recalculate total hours atomically
-        total = ServiceLog.objects.filter(scholar=scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+        # Recalculate total hours atomically for the ACTIVE semester
+        from scholarapp.models import SemesterSettings
+        active_term = SemesterSettings.objects.filter(is_active=True).first()
+        
+        if active_term:
+            total = ServiceLog.objects.filter(
+                scholar=scholar,
+                date_rendered__gte=active_term.start_date,
+                date_rendered__lte=active_term.end_date
+            ).aggregate(Sum('hours'))['hours__sum'] or 0
+        else:
+            total = ServiceLog.objects.filter(scholar=scholar).aggregate(Sum('hours'))['hours__sum'] or 0
+            
         ScholarProfile.objects.filter(pk=scholar.pk).update(total_hours_rendered=total)
 
 class Announcement(models.Model):
@@ -170,7 +198,7 @@ class Announcement(models.Model):
     rejection_reason = models.TextField(blank=True, null=True)
     
     def __str__(self):
-        return f"{self.title} ({self.get_status_display()})"
+        return f"{self.title} ({self.get_status_display()})"  # type: ignore
     
     class Meta:
         ordering = ['-created_at']
@@ -185,7 +213,9 @@ class Voucher(models.Model):
     ]
     
     STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
         ('ACTIVE', 'Active'),
+        ('REJECTED', 'Rejected'),
         ('EXPIRED', 'Expired'),
         ('FULL', 'Full'),
     ]
@@ -194,19 +224,25 @@ class Voucher(models.Model):
     description = models.TextField()
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     provider = models.CharField(max_length=100)  # e.g., "EBAIS", "Kitchen City"
+    office = models.ForeignKey(Office, on_delete=models.PROTECT, related_name='vouchers', null=True, blank=True)
     total_slots = models.IntegerField()
     remaining_slots = models.IntegerField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     expiry_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_vouchers')
     image_url = models.URLField(blank=True, null=True)  # Optional voucher image
+    rejection_reason = models.TextField(blank=True, null=True)
     
     def __str__(self):
         return f"{self.title} - {self.remaining_slots}/{self.total_slots} slots"
     
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['office', 'status']),
+            models.Index(fields=['created_by']),
+        ]
     
     def is_available(self):
         """Check if voucher is still available"""
@@ -247,6 +283,8 @@ class Penalty(models.Model):
     scholar = models.ForeignKey(User, on_delete=models.CASCADE, related_name='penalties')
     reason = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    hours_added = models.FloatField(default=50.0)
+    semester = models.ForeignKey('SemesterSettings', on_delete=models.SET_NULL, null=True, blank=True, related_name='penalties')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_penalties')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -256,4 +294,53 @@ class Penalty(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.scholar.username} - {self.reason[:50]} ({self.status})"
+        return f"{self.scholar.username} - {self.reason[:50]} ({self.status}) - {self.hours_added}hrs"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.recalculate_scholar_penalties()
+
+    def delete(self, *args, **kwargs):
+        scholar = self.scholar # Keep reference
+        super().delete(*args, **kwargs)
+        # Recalculate after deletion
+        active_penalties = Penalty.objects.filter(scholar=scholar, status='ACTIVE').aggregate(Sum('hours_added'))['hours_added__sum'] or 0
+        ScholarProfile.objects.filter(user=scholar).update(penalty_hours=active_penalties)
+        # Safety check: only call save if profile exists
+        if hasattr(scholar, 'scholar_profile'):
+            scholar.scholar_profile.save()
+
+    def recalculate_scholar_penalties(self):
+        # Sum all ACTIVE penalties for this scholar
+        active_penalties = Penalty.objects.filter(scholar=self.scholar, status='ACTIVE').aggregate(Sum('hours_added'))['hours_added__sum'] or 0
+        # Update ScholarProfile penalty_hours
+        ScholarProfile.objects.filter(user=self.scholar).update(penalty_hours=active_penalties)
+        
+        # Safety check: only call save if profile exists
+        if hasattr(self.scholar, 'scholar_profile'):
+            profile = self.scholar.scholar_profile
+            profile.save() # This triggers the dormer/penalty logic in ScholarProfile.save()
+
+
+class SemesterSettings(models.Model):
+    term_name = models.CharField(max_length=100) # e.g. "1st Semester 2026-2027"
+    start_date = models.DateField()
+    end_date = models.DateField()
+    deadline_date = models.DateField()
+    is_active = models.BooleanField(default=False)
+    penalties_processed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Semester Settings"
+        ordering = ['-start_date']
+
+    def __str__(self):
+        return f"{self.term_name} {'(Active)' if self.is_active else ''}"
+
+    def save(self, *args, **kwargs):
+        if self.is_active:
+            # Ensure only one semester is active at a time
+            SemesterSettings.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)

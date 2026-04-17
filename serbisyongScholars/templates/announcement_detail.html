@@ -125,7 +125,11 @@
                                     {% endif %}
                                 </p>
                                 <p class="text-xs text-gray-500">
-                                    Office of Admissions and Aid
+                                    {% if announcement.author %}
+                                        {{ announcement.author.assigned_office|default:"Office of Admissions and Aid" }}
+                                    {% else %}
+                                        Office of Admissions and Aid
+                                    {% endif %}
                                 </p>
                             </div>
                         </div>

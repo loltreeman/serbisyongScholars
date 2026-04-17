@@ -1,19 +1,26 @@
-from rest_framework.test import APIClient, APITestCase
-from django.test import TestCase, Client  
+# type: ignore
+from typing import TYPE_CHECKING, cast
+from rest_framework.test import APIClient, APITestCase  # type: ignore[attr-defined]
+from django.test import TestCase, Client  # type: ignore[attr-defined]
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from datetime import date, timedelta
-from .models import Announcement, User, ScholarProfile, ServiceLog, ModeratorProfile, Voucher, VoucherApplication
+from scholarapp.models import Announcement, User, ScholarProfile, ServiceLog, ModeratorProfile, Voucher, VoucherApplication
 
 User = get_user_model()
 
+if TYPE_CHECKING:
+    from rest_framework.response import Response
 
-class AdminDashboardTests(TestCase):
+
+class AdminDashboardTests(APITestCase):  # type: ignore[misc]
     """Tests for Admin Dashboard page"""
+    client: APIClient
     
     def setUp(self):
         """Create test data"""
+        super().setUp()
         # Create admin user
         self.admin = User.objects.create_user(
             username='testadmin',
@@ -57,11 +64,6 @@ class AdminDashboardTests(TestCase):
             # Update rendered hours
             profile.total_hours_rendered = hours
             profile.save()
-        
-        # Use regular Client for HTML views
-        self.client = Client()
-        # Use APIClient for API endpoints
-        self.api_client = APIClient()
     
     def test_admin_dashboard_page_loads(self):
         """Test if admin dashboard page renders successfully"""
@@ -75,9 +77,9 @@ class AdminDashboardTests(TestCase):
     
     def test_admin_dashboard_shows_correct_stats(self):
         """Test if dashboard shows correct scholar statistics"""
-        self.api_client.force_authenticate(user=self.admin)
+        self.client.force_authenticate(user=self.admin)
         url = reverse('admin_scholars_list')
-        response = self.api_client.get(url)
+        response = self.client.get(url)
         
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -89,9 +91,9 @@ class AdminDashboardTests(TestCase):
     
     def test_scholar_filtering_by_status(self):
         """Test if filtering by completion status works"""
-        self.api_client.force_authenticate(user=self.admin)
+        self.client.force_authenticate(user=self.admin)
         url = reverse('admin_scholars_list')
-        response = self.api_client.get(url, {'status': 'complete'})
+        response = self.client.get(url, {'status': 'complete'})
         
         if response.status_code == 200:
             data = response.json()
@@ -101,9 +103,9 @@ class AdminDashboardTests(TestCase):
     
     def test_scholar_search_functionality(self):
         """Test if search by student ID works"""
-        self.api_client.force_authenticate(user=self.admin)
+        self.client.force_authenticate(user=self.admin)
         url = reverse('admin_scholars_list')
-        response = self.api_client.get(url, {'search': '123450'})
+        response = self.client.get(url, {'search': '123450'})
         
         if response.status_code == 200:
             data = response.json()
@@ -126,8 +128,9 @@ class AdminDashboardTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
-class AdminScholarFilteringTests(TestCase):
+class AdminScholarFilteringTests(APITestCase):  # type: ignore[misc]
     """Tests for admin scholar filtering in the management view API."""
+    client: APIClient
 
     def setUp(self):
         self.admin = User.objects.create_user(
@@ -160,7 +163,6 @@ class AdminScholarFilteringTests(TestCase):
             hours=4.0,
         )
 
-        self.api_client = APIClient()
         self.url = reverse('admin_scholars_list')
 
     def _create_scholar(self, username, student_id, first_name, school, hours):
@@ -195,8 +197,8 @@ class AdminScholarFilteringTests(TestCase):
         return profile
 
     def test_school_filter_returns_only_matching_scholars(self):
-        self.api_client.force_authenticate(user=self.admin)
-        response = self.api_client.get(self.url, {'school': 'SOSE'})
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(self.url, {'school': 'SOSE'})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -208,8 +210,8 @@ class AdminScholarFilteringTests(TestCase):
         self.assertTrue(all(scholar['school_display'] == 'School of Science and Engineering' for scholar in data['scholars']))
 
     def test_combined_status_and_search_filters(self):
-        self.api_client.force_authenticate(user=self.admin)
-        response = self.api_client.get(self.url, {
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(self.url, {
             'status': 'on-track',
             'search': 'Brenda',
         })
@@ -222,15 +224,16 @@ class AdminScholarFilteringTests(TestCase):
         self.assertEqual(data['scholars'][0]['status'], 'on-track')
 
     def test_invalid_school_filter_returns_bad_request(self):
-        self.api_client.force_authenticate(user=self.admin)
-        response = self.api_client.get(self.url, {'school': 'NOTREAL'})
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(self.url, {'school': 'NOTREAL'})
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json()['error'], 'Invalid school filter.')
 
 
-class ProgressVisualizationTests(TestCase):
+class ProgressVisualizationTests(APITestCase):  # type: ignore[misc]
     """Tests for progress bar components"""
+    client: APIClient
     
     def setUp(self):
         """Create test data"""
@@ -251,8 +254,6 @@ class ProgressVisualizationTests(TestCase):
             scholar_grant='FULL',
             is_dormer=False  
         )
-        
-        self.client = Client()
     
     def test_progress_calculation_80_percent(self):
         """Test if progress calculates 80% correctly"""
@@ -325,13 +326,12 @@ class ProgressVisualizationTests(TestCase):
         percentage = (self.profile.total_hours_rendered / self.profile.required_hours) * 100
         self.assertGreater(percentage, 100)
 
-class ResponsiveDesignTests(TestCase):
+class ResponsiveDesignTests(APITestCase):  # type: ignore[misc]
+    client: APIClient
     """Tests for mobile responsiveness"""
     
     def setUp(self):
-        """Create test data"""
-        self.client = Client()
-    
+        """Create test data"""    
     def test_admin_dashboard_has_viewport(self):
         """Test if admin dashboard has viewport meta tag"""
         admin = User.objects.create_user(
@@ -364,7 +364,8 @@ class ResponsiveDesignTests(TestCase):
         self.assertContains(response, 'overflow-x-auto')
 
 
-class AdminModeratorTests(TestCase):
+class AdminModeratorTests(APITestCase):  # type: ignore[misc]
+    client: APIClient
     """Tests for moderator assignment"""
     
     def setUp(self):
@@ -387,14 +388,11 @@ class AdminModeratorTests(TestCase):
             first_name='Test',
             last_name='Scholar',
             is_email_verified=True
-        )
-        
-        self.api_client = APIClient()
-    
+        )    
     def test_admin_can_assign_moderator(self):
         """Test that an OAA Admin can successfully make someone a moderator"""
         # Authenticate as admin
-        self.api_client.force_authenticate(user=self.admin)
+        self.client.force_authenticate(user=self.admin)
         
         # Send correct data format that matches the view
         data = {
@@ -403,7 +401,7 @@ class AdminModeratorTests(TestCase):
         }
         
         url = reverse('assign_moderator')
-        response = self.api_client.post(url, data, format='json')
+        response = self.client.post(url, data, format='json')
         
         # Debug if it fails
         if response.status_code != 200:
@@ -420,7 +418,8 @@ class AdminModeratorTests(TestCase):
         self.assertEqual(moderator_profile.office_name, 'Rizal Library')
 
 
-class AnnouncementCategoryTests(TestCase):
+class AnnouncementCategoryTests(APITestCase):  # type: ignore[misc]
+    client: APIClient
     """Tests for announcement category tags and filtering."""
 
     def setUp(self):
@@ -451,13 +450,12 @@ class AnnouncementCategoryTests(TestCase):
             category='VOLUNTEER',
             author=self.admin,
         )
-
-        self.api_client = APIClient()
+        
         self.list_url = reverse('announcements_list')
 
     def test_list_includes_category_labels(self):
-        self.api_client.force_authenticate(user=self.scholar)
-        response = self.api_client.get(self.list_url)
+        self.client.force_authenticate(user=self.scholar)
+        response = self.client.get(self.list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -469,8 +467,8 @@ class AnnouncementCategoryTests(TestCase):
         self.assertEqual(categories['VOLUNTEER'], 'Volunteer Work')
 
     def test_list_can_be_filtered_by_category(self):
-        self.api_client.force_authenticate(user=self.scholar)
-        response = self.api_client.get(self.list_url, {'category': 'FOOD STUBS'})
+        self.client.force_authenticate(user=self.scholar)
+        response = self.client.get(self.list_url, {'category': 'FOOD STUBS'})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -480,15 +478,15 @@ class AnnouncementCategoryTests(TestCase):
         self.assertEqual(data[0]['category_label'], 'Food Stubs')
 
     def test_invalid_category_filter_returns_bad_request(self):
-        self.api_client.force_authenticate(user=self.scholar)
-        response = self.api_client.get(self.list_url, {'category': 'NOT_A_REAL_TAG'})
+        self.client.force_authenticate(user=self.scholar)
+        response = self.client.get(self.list_url, {'category': 'NOT_A_REAL_TAG'})
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json()['error'], 'Invalid announcement category.')
 
     def test_admin_can_create_announcement_with_category(self):
-        self.api_client.force_authenticate(user=self.admin)
-        response = self.api_client.post(self.list_url, {
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(self.list_url, {
             'title': 'Scholarship Briefing',
             'content': 'Attend the scholarship briefing tomorrow.',
             'category': 'OPPORTUNITY',
@@ -499,8 +497,8 @@ class AnnouncementCategoryTests(TestCase):
         self.assertEqual(response.json()['category_label'], 'Scholarship Opportunity')
 
     def test_scholar_cannot_create_announcement(self):
-        self.api_client.force_authenticate(user=self.scholar)
-        response = self.api_client.post(self.list_url, {
+        self.client.force_authenticate(user=self.scholar)
+        response = self.client.post(self.list_url, {
             'title': 'Unauthorized post',
             'content': 'This should fail.',
             'category': 'GENERAL',
@@ -510,9 +508,9 @@ class AnnouncementCategoryTests(TestCase):
         self.assertEqual(response.json()['error'], 'Only admins and moderators can create announcements')
 
 
-class AnnouncementPermissionSyncTests(TestCase):
+class AnnouncementPermissionSyncTests(APITestCase):  # type: ignore[misc]
+    client: APIClient
     def setUp(self):
-        self.api_client = APIClient()
         self.list_url = reverse('announcements_list')
         self.current_user_url = reverse('api_current_user')
 
@@ -537,8 +535,8 @@ class AnnouncementPermissionSyncTests(TestCase):
         )
 
     def test_moderator_can_create_pending_announcement(self):
-        self.api_client.force_authenticate(user=self.moderator)
-        response = self.api_client.post(self.list_url, {
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.post(self.list_url, {
             'title': 'Moderator post',
             'content': 'Needs approval.',
             'category': 'GENERAL',
@@ -548,8 +546,8 @@ class AnnouncementPermissionSyncTests(TestCase):
         self.assertEqual(response.json()['status'], 'PENDING')
 
     def test_profile_backed_moderator_can_create_pending_announcement(self):
-        self.api_client.force_authenticate(user=self.profile_only_moderator)
-        response = self.api_client.post(self.list_url, {
+        self.client.force_authenticate(user=self.profile_only_moderator)
+        response = self.client.post(self.list_url, {
             'title': 'Profile-backed moderator post',
             'content': 'Also needs approval.',
             'category': 'GENERAL',
@@ -559,8 +557,8 @@ class AnnouncementPermissionSyncTests(TestCase):
         self.assertEqual(response.json()['status'], 'PENDING')
 
     def test_current_user_endpoint_returns_effective_role(self):
-        self.api_client.force_authenticate(user=self.profile_only_moderator)
-        response = self.api_client.get(self.current_user_url)
+        self.client.force_authenticate(user=self.profile_only_moderator)
+        response = self.client.get(self.current_user_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['role'], 'MODERATOR')
@@ -568,10 +566,14 @@ class AnnouncementPermissionSyncTests(TestCase):
         self.assertTrue(response.json()['is_oaa_mod'])
 
 class VoucherSystemTests(APITestCase):
+    client: APIClient
+    
     def setUp(self):
         # Create Users
         self.admin_user = User.objects.create_user(username='admin', password='password', role='ADMIN')
         self.scholar_user = User.objects.create_user(username='scholar', password='password', role='SCHOLAR')
+        self.oaa_mod_user = User.objects.create_user(username='oaamod', password='password', role='MODERATOR')
+        ModeratorProfile.objects.create(user=self.oaa_mod_user, office_name='Office of Admission and Aid')
         
         # Create a test voucher
         self.voucher = Voucher.objects.create(
@@ -631,7 +633,7 @@ class VoucherSystemTests(APITestCase):
         response = self.client.post(f'/api/vouchers/applications/{app.id}/approve/', {
             'action': 'reject',
             'admin_notes': 'Ineligible'
-        })
+        }, format='json')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
@@ -641,3 +643,88 @@ class VoucherSystemTests(APITestCase):
         
         app.refresh_from_db()
         self.assertEqual(app.status, 'REJECTED')
+
+    def test_admin_can_edit_voucher(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.put(
+            f'/api/vouchers/{self.voucher.id}/',
+            {'title': 'Updated by Admin'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.title, 'Updated by Admin')
+
+    def test_oaa_moderator_cannot_edit_voucher(self):
+        self.client.force_authenticate(user=self.oaa_mod_user)
+        response = self.client.put(
+            f'/api/vouchers/{self.voucher.id}/',
+            {'title': 'Moderator Edit'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_voucher_rejects_past_expiry_date(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post('/api/vouchers/', {
+            'title': 'Expired Voucher',
+            'description': 'Should not be created',
+            'category': 'FOODSTUB',
+            'provider': 'Kitchen City',
+            'total_slots': 5,
+            'status': 'ACTIVE',
+            'expiry_date': (date.today() - timedelta(days=1)).isoformat(),
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('expiry_date', response.data)
+
+    def test_create_voucher_allows_today_expiry_date(self):
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.post('/api/vouchers/', {
+            'title': 'Today Voucher',
+            'description': 'Valid for today',
+            'category': 'FOODSTUB',
+            'provider': 'Kitchen City',
+            'total_slots': 5,
+            'status': 'ACTIVE',
+            'expiry_date': date.today().isoformat(),
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_expired_pending_applications_are_auto_declined(self):
+        self.client.force_authenticate(user=self.scholar_user)
+        self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.remaining_slots, 1)
+
+        self.voucher.expiry_date = date.today() - timedelta(days=1)
+        self.voucher.status = 'ACTIVE'
+        self.voucher.save(update_fields=['expiry_date', 'status'])
+
+        response = self.client.get('/api/vouchers/my-applications/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        app = VoucherApplication.objects.get(scholar=self.scholar_user, voucher=self.voucher)
+        app.refresh_from_db()
+        self.assertEqual(app.status, 'REJECTED')
+        self.assertIn('Auto-declined', app.admin_notes)
+
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.status, 'EXPIRED')
+        self.assertEqual(self.voucher.remaining_slots, 2)
+
+    def test_non_expired_pending_application_remains_pending(self):
+        self.client.force_authenticate(user=self.scholar_user)
+        apply_response = self.client.post(f'/api/vouchers/{self.voucher.id}/apply/')
+        self.assertEqual(apply_response.status_code, status.HTTP_201_CREATED)
+
+        response = self.client.get('/api/vouchers/my-applications/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        app = VoucherApplication.objects.get(scholar=self.scholar_user, voucher=self.voucher)
+        self.assertEqual(app.status, 'PENDING')

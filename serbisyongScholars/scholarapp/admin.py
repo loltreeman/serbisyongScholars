@@ -1,8 +1,29 @@
 from django.contrib import admin
-from .models import User, ScholarProfile, ServiceLog, Announcement
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty, SemesterSettings
 
-admin.site.register(User)
-admin.site.register(ScholarProfile)
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+
+class ScholarProfileInline(admin.StackedInline):
+    model = ScholarProfile
+    can_delete = False
+    verbose_name_plural = 'Scholar Profile'
+    fk_name = 'user'
+
+@admin.register(User)
+class UserAdmin(BaseUserAdmin):
+    inlines = (ScholarProfileInline, )
+    list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'is_staff')
+    list_filter = ('role', 'is_staff', 'is_superuser', 'is_active', 'groups')
+    
+    # Add 'role' to the user editing forms in admin
+    fieldsets = BaseUserAdmin.fieldsets + (
+        ('Role Information', {'fields': ('role',)}),
+    )
+    add_fieldsets = BaseUserAdmin.add_fieldsets + (
+        ('Role Information', {'fields': ('role',)}),
+    )
+
+# admin.site.register(ScholarProfile) # Removed because it's now an Inline inside User
 admin.site.register(ServiceLog)
 
 @admin.register(Announcement)
@@ -10,9 +31,6 @@ class AnnouncementAdmin(admin.ModelAdmin):
     list_display = ('title', 'category', 'created_at', 'author')
     list_filter = ('category', 'created_at')
     search_fields = ('title', 'content')
-
-from django.contrib import admin
-from .models import Voucher, VoucherApplication, Penalty
 
 @admin.register(Voucher)
 class VoucherAdmin(admin.ModelAdmin):
@@ -40,8 +58,14 @@ class VoucherApplicationAdmin(admin.ModelAdmin):
 
 @admin.register(Penalty)
 class PenaltyAdmin(admin.ModelAdmin):
-    list_display = ('scholar', 'reason', 'status', 'created_by', 'created_at')
-    list_filter = ('status', 'created_at')
+    list_display = ('scholar', 'reason', 'status', 'hours_added', 'created_by', 'created_at')
+    list_filter = ('status', 'created_at', 'semester')
     search_fields = ('scholar__username', 'scholar__first_name', 'reason')
     readonly_fields = ('created_at', 'updated_at')
     list_editable = ('status',)
+
+@admin.register(SemesterSettings)
+class SemesterSettingsAdmin(admin.ModelAdmin):
+    list_display = ('term_name', 'start_date', 'deadline_date', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('term_name',)
