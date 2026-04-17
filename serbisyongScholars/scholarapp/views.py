@@ -1602,9 +1602,6 @@ def process_penalties(request):
         )
 
     # --- STEP 1: Snapshot violators BEFORE any writes ---
-    # Evaluate the queryset now so missing_hours is calculated from the current
-    # state. Creating Penalty records later triggers ScholarProfile.save() which
-    # changes required_hours, so we must capture the pre-write values.
     violators_snapshot = [
         {
             'profile': profile,
@@ -1616,12 +1613,19 @@ def process_penalties(request):
         )
     ]
 
+    # --- STEP 2: Snapshot ALL scholars' carry-over hours BEFORE we reset them ---
+    all_scholars_snapshot = [
+        {
+            'profile': p,
+            'carry_over': p.carry_over_hours
+        }
+        for p in ScholarProfile.objects.filter(user__role='SCHOLAR')
+    ]
+
     penalty_count = 0
 
     with transaction.atomic():
-        # --- STEP 2: Create Penalty records (fixed 50h each) ---
-        # Penalty.save() -> recalculate_scholar_penalties() will fetch the
-        # profile fresh from DB and update penalty_hours + required_hours.
+        # --- STEP 3: Create Penalty records (fixed 50h each) ---
         for item in violators_snapshot:
             profile = item['profile']
             missing_hours = item['missing_hours']
@@ -1633,51 +1637,58 @@ def process_penalties(request):
                     f"Deadline: {semester.deadline_date}. "
                     f"Was missing {missing_hours}h at time of processing."
                 ),
-                hours_added=50.0,  # Fixed penalty — always 50h
+                hours_added=50.0,
                 semester=semester,
                 created_by=request.user,
                 status='ACTIVE'
             )
             penalty_count += 1
 
-        # --- STEP 3: Reset rendered hours for the NEW semester ---
-        # refresh_from_db() is essential: Penalty.save() already updated
-        # penalty_hours in DB via recalculate_scholar_penalties(), but the
-        # in-loop 'profile' object is stale. We need the current penalty_hours
-        # before calling save() so that required_hours is derived correctly.
-        for item in violators_snapshot:
-            profile = item['profile']
-            profile.refresh_from_db()
-            profile.total_hours_rendered = 0.0
-            # ScholarProfile.save() will compute:
-            #   required_hours = (15 if dormer else 10) + penalty_hours (now 50+)
-            profile.save()
-
-        # --- STEP 4: Mark semester as processed ---
+        # --- STEP 4: Mark old semester processed ---
         semester.penalties_processed = True
         semester.save()
 
-        # --- STEP 5: Auto-create next semester ---
+        # --- STEP 5: Auto-create and ACTIVATE next semester ---
         new_start = semester.end_date + timedelta(days=1)
         if new_start < today:
             new_start = today
 
-        new_end = new_start + timedelta(days=150)   # ~5 months
-        new_deadline = new_end - timedelta(days=14)  # 2 weeks before end
+        new_end = new_start + timedelta(days=150)
+        new_deadline = new_end - timedelta(days=14)
         next_term_name = f"Next Semester (Auto-created from {semester.term_name})"
 
-        SemesterSettings.objects.create(
+        new_semester = SemesterSettings.objects.create(
             term_name=next_term_name,
             start_date=new_start,
             end_date=new_end,
             deadline_date=new_deadline,
-            is_active=True  # Triggers deactivation of current semester via model.save()
+            is_active=True
         )
+
+        # --- STEP 6: Reset ALL scholars for the NEW semester ---
+        for item in all_scholars_snapshot:
+            profile = item['profile']
+            carry_over = item['carry_over']
+            
+            # Reset rendered hours for the new start
+            profile.refresh_from_db()
+            profile.total_hours_rendered = 0.0
+            profile.save() # Triggers required_hours calc for new semester and resets carry_over_hours
+            
+            # Apply carry-over if applicable
+            if carry_over > 0:
+                ServiceLog.objects.create(
+                    scholar=profile.user,
+                    office_name="System",
+                    task_description=f"Carry-over hours from {semester.term_name}",
+                    date_rendered=new_semester.start_date,
+                    hours=carry_over
+                )
 
     return Response({
         'message': (
             f'Successfully processed penalties for {penalty_count} scholar(s). '
-            f'A new semester has been created.'
+            f'A new semester has been created and all hours have been reset.'
         ),
         'semester': semester.term_name,
         'count': penalty_count

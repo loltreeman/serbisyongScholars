@@ -362,7 +362,18 @@ class SemesterSettings(models.Model):
     def __str__(self):
         return f"{self.term_name} {'(Active)' if self.is_active else ''}"
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValidationError({'end_date': 'End date cannot be earlier than start date.'})
+        if self.start_date and self.deadline_date:
+            if self.deadline_date < self.start_date:
+                raise ValidationError({'deadline_date': 'Deadline cannot be earlier than start date.'})
+            if self.deadline_date > self.end_date:
+                raise ValidationError({'deadline_date': 'Deadline cannot be later than end date.'})
+
     def save(self, *args, **kwargs):
+        self.full_clean()
         if self.is_active:
             # Ensure only one semester is active at a time
             SemesterSettings.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)

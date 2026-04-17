@@ -275,3 +275,15 @@ class SemesterSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = SemesterSettings
         fields = '__all__'
+
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        deadline_date = data.get('deadline_date')
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({'end_date': 'End date cannot be earlier than start date.'})
+        if start_date and deadline_date and deadline_date < start_date:
+            raise serializers.ValidationError({'deadline_date': 'Deadline cannot be earlier than start date.'})
+        if end_date and deadline_date and deadline_date > end_date:
+            raise serializers.ValidationError({'deadline_date': 'Deadline cannot be later than end date.'})
+        return data
