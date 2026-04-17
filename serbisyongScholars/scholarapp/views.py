@@ -22,10 +22,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Q, Sum
 from datetime import date
 
-from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, ModeratorProfile, Office, Voucher, VoucherApplication, Penalty, SemesterSettings
 from scholarapp.serializers import (
     RegistrationSerializer, ServiceLogSerializer, AnnouncementSerializer,
-    VoucherSerializer, VoucherApplicationSerializer, PenaltySerializer
+    VoucherSerializer, VoucherApplicationSerializer, PenaltySerializer, SemesterSettingsSerializer
 )
 
 
@@ -498,8 +498,9 @@ def admin_scholars_list(request):
             'rendered_hours': rendered,
             'required_hours': required,
             'carry_over': profile.carry_over_hours,
+            'penalty_hours': profile.penalty_hours,
             'status': status
-    })
+        })
     
     # Calculate stats
     total_scholars = len(scholars)
@@ -1512,3 +1513,91 @@ def penalty_detail(request, penalty_id):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+
+@api_view(['GET', 'POST', 'PUT'])
+@permission_classes([IsAuthenticated])
+def semester_settings_api(request):
+    """Admin-only view to manage semester dates and active status."""
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin only'}, status=403)
+
+    if request.method == 'GET':
+        settings = SemesterSettings.objects.all()
+        serializer = SemesterSettingsSerializer(settings, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = SemesterSettingsSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+    elif request.method == 'PUT':
+        # Updates the active semester (assume ID passed in data or just update the active one)
+        setting_id = request.data.get('id')
+        try:
+            setting = SemesterSettings.objects.get(id=setting_id)
+        except SemesterSettings.DoesNotExist:
+            return Response({'error': 'Semester setting not found'}, status=404)
+        
+        serializer = SemesterSettingsSerializer(setting, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def process_penalties(request):
+    """
+    Admin-only view to process penalties for scholars who missed the deadline.
+    Adds 50 hours to penalty_hours and resets total_hours_rendered.
+    """
+    if request.user.role != 'ADMIN':
+        return Response({'error': 'Admin only'}, status=403)
+
+    semester_id = request.data.get('semester_id')
+    try:
+        semester = SemesterSettings.objects.get(id=semester_id)
+    except SemesterSettings.DoesNotExist:
+        return Response({'error': 'Active semester not found'}, status=404)
+
+    # Check if we are at or past the deadline
+    today = date.today()
+    if today < semester.deadline_date:
+         return Response({'error': f'Cannot process penalties before the deadline ({semester.deadline_date})'}, status=400)
+
+    # Find violators: scholars whose total_hours_rendered < required_hours
+    # We filter by role='SCHOLAR' to be safe
+    violators = ScholarProfile.objects.filter(
+        user__role='SCHOLAR',
+        total_hours_rendered__lt=F('required_hours')
+    )
+
+    penalty_count = 0
+    with threading.Lock(): # Simple concurrency protection for bulk update
+        for profile in violators:
+            # 1. Create Penalty record
+            Penalty.objects.create(
+                scholar=profile.user,
+                reason=f"Failed to meet service hours for {semester.term_name}. Deadline: {semester.deadline_date}",
+                hours_added=50.0,
+                semester=semester,
+                created_by=request.user,
+                status='ACTIVE'
+            )
+
+            # 2. Add 50 hours to penalty_hours and reset rendering for NEW semester
+            profile.penalty_hours += 50.0
+            profile.total_hours_rendered = 0.0
+            profile.save() # This will trigger required_hours update in ScholarProfile.save()
+            penalty_count += 1
+
+    return Response({
+        'message': f'Successfully processed penalties for {penalty_count} scholars.',
+        'semester': semester.term_name,
+        'count': penalty_count
+    })

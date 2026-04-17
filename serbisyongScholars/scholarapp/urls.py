@@ -38,4 +38,6 @@ urlpatterns = [
     path('vouchers-page/', views.vouchers_page, name='vouchers_page'),
     path('penalties/', views.penalties_list, name='penalties_list'),
     path('penalties/<int:penalty_id>/', views.penalty_detail, name='penalty_detail'),
+    path('admin/semester-settings/', views.semester_settings_api, name='api_semester_settings'),
+    path('admin/process-penalties/', views.process_penalties, name='api_process_penalties'),
 ]

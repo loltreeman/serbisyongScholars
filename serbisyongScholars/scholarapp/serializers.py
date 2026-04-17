@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
-from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty, SemesterSettings
 from datetime import date
 
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -254,12 +254,18 @@ class PenaltySerializer(serializers.ModelSerializer):
     scholar_username = serializers.CharField(source='scholar.username', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    semester_name = serializers.CharField(source='semester.term_name', read_only=True)
 
     class Meta:
         model = Penalty
         fields = [
             'id', 'scholar', 'scholar_name', 'scholar_username',
-            'reason', 'status', 'status_display',
+            'reason', 'status', 'status_display', 'hours_added', 'semester', 'semester_name',
             'created_by', 'created_by_name', 'created_at', 'updated_at', 'notes'
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at']
+
+class SemesterSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SemesterSettings
+        fields = '__all__'

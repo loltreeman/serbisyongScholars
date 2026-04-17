@@ -61,6 +61,7 @@ class ScholarProfile(models.Model):
     required_hours = models.FloatField(validators=[MinValueValidator(0.0)], blank=True)
     total_hours_rendered = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
     carry_over_hours = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
+    penalty_hours = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
 
 
     SCHOOL_CHOICES = [
@@ -84,10 +85,7 @@ class ScholarProfile(models.Model):
     def save(self, *args, **kwargs):
         
         # Dormer logic
-        if self.is_dormer:
-            self.required_hours = 15.0
-        else:
-            self.required_hours = 10.0
+        self.required_hours = (15.0 if self.is_dormer else 10.0) + self.penalty_hours
 
         # Carry over calculation
         if ((self.total_hours_rendered-self.required_hours) >= 0):
@@ -263,6 +261,8 @@ class Penalty(models.Model):
     scholar = models.ForeignKey(User, on_delete=models.CASCADE, related_name='penalties')
     reason = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    hours_added = models.FloatField(default=50.0)
+    semester = models.ForeignKey('SemesterSettings', on_delete=models.SET_NULL, null=True, blank=True, related_name='penalties')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_penalties')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -272,4 +272,27 @@ class Penalty(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.scholar.username} - {self.reason[:50]} ({self.status})"
+        return f"{self.scholar.username} - {self.reason[:50]} ({self.status}) - {self.hours_added}hrs"
+
+
+class SemesterSettings(models.Model):
+    term_name = models.CharField(max_length=100) # e.g. "1st Semester 2026-2027"
+    start_date = models.DateField()
+    end_date = models.DateField()
+    deadline_date = models.DateField()
+    is_active = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Semester Settings"
+        ordering = ['-start_date']
+
+    def __str__(self):
+        return f"{self.term_name} {'(Active)' if self.is_active else ''}"
+
+    def save(self, *args, **kwargs):
+        if self.is_active:
+            # Ensure only one semester is active at a time
+            SemesterSettings.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)

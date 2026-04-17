@@ -1,5 +1,5 @@
 from django.contrib import admin
-from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty
+from scholarapp.models import User, ScholarProfile, ServiceLog, Announcement, Voucher, VoucherApplication, Penalty, SemesterSettings
 
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
@@ -58,8 +58,14 @@ class VoucherApplicationAdmin(admin.ModelAdmin):
 
 @admin.register(Penalty)
 class PenaltyAdmin(admin.ModelAdmin):
-    list_display = ('scholar', 'reason', 'status', 'created_by', 'created_at')
-    list_filter = ('status', 'created_at')
+    list_display = ('scholar', 'reason', 'status', 'hours_added', 'created_by', 'created_at')
+    list_filter = ('status', 'created_at', 'semester')
     search_fields = ('scholar__username', 'scholar__first_name', 'reason')
     readonly_fields = ('created_at', 'updated_at')
     list_editable = ('status',)
+
+@admin.register(SemesterSettings)
+class SemesterSettingsAdmin(admin.ModelAdmin):
+    list_display = ('term_name', 'start_date', 'deadline_date', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('term_name',)
