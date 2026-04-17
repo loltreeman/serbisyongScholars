@@ -301,25 +301,48 @@ class Penalty(models.Model):
         self.recalculate_scholar_penalties()
 
     def delete(self, *args, **kwargs):
-        scholar = self.scholar # Keep reference
+        scholar = self.scholar  # Keep reference before deletion
         super().delete(*args, **kwargs)
-        # Recalculate after deletion
-        active_penalties = Penalty.objects.filter(scholar=scholar, status='ACTIVE').aggregate(Sum('hours_added'))['hours_added__sum'] or 0
-        ScholarProfile.objects.filter(user=scholar).update(penalty_hours=active_penalties)
-        # Safety check: only call save if profile exists
-        if hasattr(scholar, 'scholar_profile'):
-            scholar.scholar_profile.save()
+
+        # Recalculate after deletion by summing remaining ACTIVE penalties
+        active_penalties = Penalty.objects.filter(
+            scholar=scholar, status='ACTIVE'
+        ).aggregate(Sum('hours_added'))['hours_added__sum'] or 0.0
+
+        # Fetch profile fresh from DB to avoid stale cache, then update and save.
+        # select_for_update() prevents race conditions during concurrent updates.
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                profile = ScholarProfile.objects.select_for_update().get(user=scholar)
+                profile.penalty_hours = active_penalties
+                profile.save()  # triggers required_hours = base + penalty_hours
+        except ScholarProfile.DoesNotExist:
+            pass  # Not a scholar (e.g. admin), safe to skip
+
 
     def recalculate_scholar_penalties(self):
+        """Recalculate and persist penalty_hours for the linked scholar.
+
+        Always fetches the ScholarProfile fresh from the DB to avoid Django's
+        relation-cache returning a stale object (penalty_hours=0), which would
+        cause ScholarProfile.save() to overwrite the correct required_hours.
+        """
         # Sum all ACTIVE penalties for this scholar
-        active_penalties = Penalty.objects.filter(scholar=self.scholar, status='ACTIVE').aggregate(Sum('hours_added'))['hours_added__sum'] or 0
-        # Update ScholarProfile penalty_hours
-        ScholarProfile.objects.filter(user=self.scholar).update(penalty_hours=active_penalties)
-        
-        # Safety check: only call save if profile exists
-        if hasattr(self.scholar, 'scholar_profile'):
-            profile = self.scholar.scholar_profile
-            profile.save() # This triggers the dormer/penalty logic in ScholarProfile.save()
+        active_penalties = Penalty.objects.filter(
+            scholar=self.scholar, status='ACTIVE'
+        ).aggregate(Sum('hours_added'))['hours_added__sum'] or 0.0
+
+        # Fetch profile fresh from DB and update atomically to avoid stale cache.
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                profile = ScholarProfile.objects.select_for_update().get(user=self.scholar)
+                profile.penalty_hours = active_penalties
+                profile.save()  # triggers required_hours = base + penalty_hours
+        except ScholarProfile.DoesNotExist:
+            pass  # Not a scholar (e.g. admin), safe to skip
+
 
 
 class SemesterSettings(models.Model):

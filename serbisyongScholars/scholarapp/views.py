@@ -1567,8 +1567,17 @@ def semester_settings_api(request):
 @permission_classes([IsAuthenticated])
 def process_penalties(request):
     """
-    Admin-only view to process penalties for scholars who missed the deadline.
-    Adds 50 hours to penalty_hours and resets total_hours_rendered.
+    Admin-only. Process end-of-semester penalties for scholars who missed their
+    required service hours.
+
+    Penalty rule: a fixed 50 hours is added to the scholar's penalty_hours
+    for the new semester. The new semester's required_hours will therefore be:
+        10h (or 15h for dormers) + 50h penalty = 60h (or 65h for dormers)
+
+    Steps:
+        1. Pre-snapshot all violators and their missing hours (read-only).
+        2. Inside a single transaction: create Penalty records, reset rendered
+           hours, mark semester processed, auto-create next semester.
     """
     if request.user.role != 'ADMIN':
         return Response({'error': 'Admin only'}, status=403)
@@ -1577,72 +1586,100 @@ def process_penalties(request):
     try:
         semester = SemesterSettings.objects.get(id=semester_id)
     except SemesterSettings.DoesNotExist:
-        return Response({'error': 'Active semester not found'}, status=404)
+        return Response({'error': 'Semester not found'}, status=404)
 
-    # Check if we are at or past the deadline
     today = date.today()
     if today < semester.deadline_date:
-         return Response({'error': f'Cannot process penalties before the deadline ({semester.deadline_date})'}, status=400)
+        return Response(
+            {'error': f'Cannot process penalties before the deadline ({semester.deadline_date})'},
+            status=400
+        )
 
     if semester.penalties_processed:
-        return Response({'error': f'Penalties for {semester.term_name} have already been processed.'}, status=400)
+        return Response(
+            {'error': f'Penalties for {semester.term_name} have already been processed.'},
+            status=400
+        )
 
-    # Find violators: scholars whose total_hours_rendered < required_hours
-    # We filter by role='SCHOLAR' to be safe
-    violators = ScholarProfile.objects.filter(
-        user__role='SCHOLAR',
-        total_hours_rendered__lt=F('required_hours')
-    )
+    # --- STEP 1: Snapshot violators BEFORE any writes ---
+    # Evaluate the queryset now so missing_hours is calculated from the current
+    # state. Creating Penalty records later triggers ScholarProfile.save() which
+    # changes required_hours, so we must capture the pre-write values.
+    violators_snapshot = [
+        {
+            'profile': profile,
+            'missing_hours': max(0.0, profile.required_hours - profile.total_hours_rendered),
+        }
+        for profile in ScholarProfile.objects.select_related('user').filter(
+            user__role='SCHOLAR',
+            total_hours_rendered__lt=F('required_hours')
+        )
+    ]
 
     penalty_count = 0
-    with threading.Lock(): # Simple concurrency protection for bulk update
-        for profile in violators:
-            # Calculate exactly how many required hours they missed rendering
-            missing_hours = profile.required_hours - profile.total_hours_rendered
-            if missing_hours < 0:
-                missing_hours = 0.0
 
-            # 1. Create Penalty record
+    with transaction.atomic():
+        # --- STEP 2: Create Penalty records (fixed 50h each) ---
+        # Penalty.save() -> recalculate_scholar_penalties() will fetch the
+        # profile fresh from DB and update penalty_hours + required_hours.
+        for item in violators_snapshot:
+            profile = item['profile']
+            missing_hours = item['missing_hours']
+
             Penalty.objects.create(
                 scholar=profile.user,
-                reason=f"Failed to meet service hours for {semester.term_name}. Deadline: {semester.deadline_date}. Missing: {missing_hours}h",
-                hours_added=50.0 + missing_hours,
+                reason=(
+                    f"Failed to meet service hours for {semester.term_name}. "
+                    f"Deadline: {semester.deadline_date}. "
+                    f"Was missing {missing_hours}h at time of processing."
+                ),
+                hours_added=50.0,  # Fixed penalty — always 50h
                 semester=semester,
                 created_by=request.user,
                 status='ACTIVE'
             )
-
-            # 2. Reset rendering for NEW semester
-            # The penalty hours are now handled automatically by Penalty.save()
-            profile.total_hours_rendered = 0.0
-            profile.save() 
             penalty_count += 1
-        
-        # Mark semester as processed
+
+        # --- STEP 3: Reset rendered hours for the NEW semester ---
+        # refresh_from_db() is essential: Penalty.save() already updated
+        # penalty_hours in DB via recalculate_scholar_penalties(), but the
+        # in-loop 'profile' object is stale. We need the current penalty_hours
+        # before calling save() so that required_hours is derived correctly.
+        for item in violators_snapshot:
+            profile = item['profile']
+            profile.refresh_from_db()
+            profile.total_hours_rendered = 0.0
+            # ScholarProfile.save() will compute:
+            #   required_hours = (15 if dormer else 10) + penalty_hours (now 50+)
+            profile.save()
+
+        # --- STEP 4: Mark semester as processed ---
         semester.penalties_processed = True
         semester.save()
 
-        # 3. Auto-create NEXT Semester
+        # --- STEP 5: Auto-create next semester ---
         new_start = semester.end_date + timedelta(days=1)
         if new_start < today:
-             new_start = today
-             
-        new_end = new_start + timedelta(days=150) # Approx 5 months
-        new_deadline = new_end - timedelta(days=14) # 2 weeks before end
-        
-        # Determine next term name if possible, else generic
+            new_start = today
+
+        new_end = new_start + timedelta(days=150)   # ~5 months
+        new_deadline = new_end - timedelta(days=14)  # 2 weeks before end
         next_term_name = f"Next Semester (Auto-created from {semester.term_name})"
-        
+
         SemesterSettings.objects.create(
             term_name=next_term_name,
             start_date=new_start,
             end_date=new_end,
             deadline_date=new_deadline,
-            is_active=True # This will deactivate the current one automatically via model save() logic
+            is_active=True  # Triggers deactivation of current semester via model.save()
         )
 
     return Response({
-        'message': f'Successfully processed penalties for {penalty_count} scholars. A new semester has been created.',
+        'message': (
+            f'Successfully processed penalties for {penalty_count} scholar(s). '
+            f'A new semester has been created.'
+        ),
         'semester': semester.term_name,
         'count': penalty_count
     })
+
