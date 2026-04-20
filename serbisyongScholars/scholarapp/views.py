@@ -1601,30 +1601,37 @@ def process_penalties(request):
             status=400
         )
 
-    # --- STEP 1: Snapshot violators BEFORE any writes ---
-    # Evaluate the queryset now so missing_hours is calculated from the current
-    # state. Creating Penalty records later triggers ScholarProfile.save() which
-    # changes required_hours, so we must capture the pre-write values.
-    violators_snapshot = [
+    # --- STEP 1: Snapshot ALL scholars BEFORE any writes ---
+    # Capture all scholars' states including missing_hours and carry_over.
+    # We need violators for penalties and ALL scholars for reset + carry_over.
+    all_scholars_snapshot = [
         {
             'profile': profile,
             'missing_hours': max(0.0, profile.required_hours - profile.total_hours_rendered),
+            'is_violator': profile.total_hours_rendered < profile.required_hours,
         }
         for profile in ScholarProfile.objects.select_related('user').filter(
-            user__role='SCHOLAR',
-            total_hours_rendered__lt=F('required_hours')
+            user__role='SCHOLAR'
         )
     ]
 
     penalty_count = 0
 
     with transaction.atomic():
-        # --- STEP 2: Create Penalty records (fixed 50h each) ---
+        # --- STEP 2: Create Penalty records for violators ---
+        # Penalty rule: 50h base + missing_hours (if any)
         # Penalty.save() -> recalculate_scholar_penalties() will fetch the
         # profile fresh from DB and update penalty_hours + required_hours.
-        for item in violators_snapshot:
+        for item in all_scholars_snapshot:
+            if not item['is_violator']:
+                continue  # Skip scholars who met requirements
+
             profile = item['profile']
             missing_hours = item['missing_hours']
+
+            # Penalty: 50h + missing_hours (so 0 missing = 50h total)
+            # This ensures 0 rendered hours → 50h penalty, not 50h penalty for missing calc
+            penalty_hours_value = 50.0 + missing_hours
 
             Penalty.objects.create(
                 scholar=profile.user,
@@ -1633,24 +1640,31 @@ def process_penalties(request):
                     f"Deadline: {semester.deadline_date}. "
                     f"Was missing {missing_hours}h at time of processing."
                 ),
-                hours_added=50.0,  # Fixed penalty — always 50h
+                hours_added=penalty_hours_value,
                 semester=semester,
                 created_by=request.user,
                 status='ACTIVE'
             )
             penalty_count += 1
 
-        # --- STEP 3: Reset rendered hours for the NEW semester ---
-        # refresh_from_db() is essential: Penalty.save() already updated
-        # penalty_hours in DB via recalculate_scholar_penalties(), but the
-        # in-loop 'profile' object is stale. We need the current penalty_hours
-        # before calling save() so that required_hours is derived correctly.
-        for item in violators_snapshot:
+        # --- STEP 3: Calculate and preserve carry-over, then reset rendered hours for ALL scholars ---
+        # Carry-over should be calculated BEFORE resetting hours (excess from previous semester).
+        # Then reset rendered hours for NEW semester (both violators and compliant scholars).
+        for item in all_scholars_snapshot:
             profile = item['profile']
             profile.refresh_from_db()
+
+            # Calculate carry-over from previous semester BEFORE reset
+            # Carry-over = excess hours (rendered - required), or 0 if negative
+            if profile.total_hours_rendered > profile.required_hours:
+                profile.carry_over_hours = profile.total_hours_rendered - profile.required_hours
+            else:
+                profile.carry_over_hours = 0.0
+
+            # Reset rendered hours for NEW semester
             profile.total_hours_rendered = 0.0
             # ScholarProfile.save() will compute:
-            #   required_hours = (15 if dormer else 10) + penalty_hours (now 50+)
+            #   required_hours = (15 if dormer else 10) + penalty_hours
             profile.save()
 
         # --- STEP 4: Mark semester as processed ---
