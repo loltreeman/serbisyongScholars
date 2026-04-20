@@ -174,8 +174,8 @@ function renderAnnouncements(announcements) {
             ? 'announcements'
             : `${getCategoryInfo(currentFilter).label.toLowerCase()} announcements`;
         container.innerHTML = `
-            <div class="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-200">
-                <p class="text-gray-500">No approved ${categoryLabel} found.</p>
+            <div class="text-center py-12 bg-white rounded-lg border-2 border-dashed border-slate-200">
+                <p class="text-slate-500">No approved ${categoryLabel} found.</p>
             </div>
         `;
         return;
@@ -192,7 +192,7 @@ function renderAnnouncements(announcements) {
  */
 function createAnnouncementCard(announcement) {
     const div = document.createElement('div');
-    div.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full hover:shadow-md transition';
+    div.className = 'announcement-card';
     
     const categoryInfo = getCategoryInfo(
         announcement.category,
@@ -226,8 +226,8 @@ function createAnnouncementCard(announcement) {
     
     div.innerHTML = `
         <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-2">
-                <span class="px-3 py-1 rounded-full text-sm font-semibold ${categoryInfo.bgColor} ${categoryInfo.textColor}">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="announcement-category">
                     ${categoryInfo.label}
                 </span>
                 ${showStatusBadge ? `
@@ -239,16 +239,16 @@ function createAnnouncementCard(announcement) {
                     </span>
                 ` : ''}
             </div>
-            <div class="flex items-center gap-4">
-                <span class="text-xs text-gray-500">${date}</span>
+            <div class="flex items-center gap-4 flex-shrink-0">
+                <span class="announcement-date">${date}</span>
                 ${showActions ? `
                     <div class="flex items-center gap-2">
                         <button onclick="event.stopPropagation(); editAnnouncement(${announcement.id})" 
-                                class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
+                                class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                         </button>
                         <button onclick="event.stopPropagation(); deleteAnnouncement(${announcement.id})" 
-                                class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete">
+                                class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         </button>
                     </div>
@@ -257,16 +257,16 @@ function createAnnouncementCard(announcement) {
         </div>
         
         <div class="cursor-pointer" onclick="window.location.href = '/announcements/${announcement.id}/'">
-            <h3 class="text-xl font-bold text-gray-900 mb-1">
+            <h3 class="announcement-title">
                 ${announcement.title}
             </h3>
             
-            <p class="text-gray-600 mb-3 line-clamp-2 text-sm">
+            <p class="announcement-content">
                 ${announcement.content}
             </p>
             
             <div class="flex items-center justify-between mt-4">
-                <p class="text-xs text-gray-500">
+                <p class="text-xs text-slate-500">
                     Posted by <span class="font-semibold">${announcement.author_name || 'OAA Administrator'}</span>
                 </p>
                 ${announcement.external_link ? `
