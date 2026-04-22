@@ -6,22 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Moderator Dashboard - serbisyongScholar</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+    </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50">
 
     {% include 'partials/navbar.html' %}
 
     <div class="max-w-7xl mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-2">Moderator Dashboard</h1>
-        <p class="text-gray-500 mb-8">Welcome back, {{ request.user.get_full_name|default:request.user.username }}
+        <h1 class="text-3xl font-bold mb-2 text-slate-900">Moderator Dashboard</h1>
+        <p class="text-slate-600 mb-8">Welcome back, {{ request.user.get_full_name|default:request.user.username }}
             {% if request.user.assigned_office %}
                 &mdash; {{ request.user.assigned_office }}
             {% endif %}
         </p>
 
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card mb-6">
+            <div class="card-body">
+                <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <a href="/encode/" class="block p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
                     <div class="text-2xl mb-2">📋</div>
                     <h3 class="font-bold text-lg mb-1">Encode Service Hours</h3>
@@ -42,6 +50,7 @@
                     <h3 class="font-bold text-lg mb-1">View Announcements</h3>
                     <p class="text-gray-600 text-sm">Browse all posted announcements</p>
                 </a>
+            </div>
             </div>
         </div>
     </div>

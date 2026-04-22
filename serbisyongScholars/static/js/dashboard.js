@@ -46,19 +46,19 @@ if (!username || username === "null") {
     handleLogout(); 
 }
 
-const metaEl = document.getElementById("meta");
-const userNameEl = document.getElementById("user-name");
-const logsContainer = document.getElementById("logs-container");
-const statRendered = document.getElementById("stat-rendered");
-const statActivities = document.getElementById("stat-activities");
-const statTotal = document.getElementById("stat-total");
-const progressRendered = document.getElementById("progress-rendered");
-const progressRequired = document.getElementById("progress-required");
-const progressPercent = document.getElementById("progress-percent");
-const progressBar = document.getElementById("progress-bar");
-const hoursRemaining = document.getElementById("hours-remaining");
-
 async function load() {
+    const metaEl = document.getElementById("meta");
+    const userNameEl = document.getElementById("user-name");
+    const logsContainer = document.getElementById("logs-container");
+    const statRendered = document.getElementById("stat-rendered");
+    const statActivities = document.getElementById("stat-activities");
+    const statTotal = document.getElementById("stat-total");
+    const progressRendered = document.getElementById("progress-rendered");
+    const progressRequired = document.getElementById("progress-required");
+    const progressPercent = document.getElementById("progress-percent");
+    const progressBar = document.getElementById("progress-bar");
+    const hoursRemaining = document.getElementById("hours-remaining");
+
     try {
         const res = await fetch(
             `/api/scholar/dashboard/?username=${encodeURIComponent(username)}`
@@ -77,8 +77,8 @@ async function load() {
 
         const data = await res.json();
 
-        userNameEl.textContent = data.name || username;
-        metaEl.textContent = `${data.student_id || "N/A"} • ${
+        if (userNameEl) userNameEl.textContent = data.name || username;
+        if (metaEl) metaEl.textContent = `${data.student_id || "N/A"} • ${
             data.is_dormer ? "Dormer" : "Non-Dormer"
         } • ${data.program || "Loyola Schools"}`;
 
@@ -90,18 +90,19 @@ async function load() {
         const remaining = Math.max(required - rendered, 0);
         const activities = data.service_logs ? data.service_logs.length : 0;
 
-        statRendered.textContent = rendered;
-        statActivities.textContent = activities;
-        statTotal.textContent = rendered + "h";
-        progressRendered.textContent = rendered;
-        progressRequired.textContent = required;
-        progressPercent.textContent = percentage + "%";
-        progressBar.style.width = percentage + "%";
-        hoursRemaining.textContent = remaining;
+    if (statRendered) statRendered.textContent = rendered;
+    if (statActivities) statActivities.textContent = activities;
+    if (statTotal) statTotal.textContent = rendered + "h";
+
+    if (progressRendered) progressRendered.textContent = rendered;
+    if (progressRequired) progressRequired.textContent = required;
+    if (progressPercent) progressPercent.textContent = percentage + "%";
+    if (progressBar) progressBar.style.width = percentage + "%";
+    if (hoursRemaining) hoursRemaining.textContent = remaining;
 
         if (percentage >= 100) {
-            progressPercent.classList.add("complete");
-            progressBar.classList.add("complete");
+            if (progressPercent) progressPercent.classList.add("complete");
+            if (progressBar) progressBar.classList.add("complete");
         }
 
         if (!data.service_logs || data.service_logs.length === 0) {
@@ -269,6 +270,7 @@ async function loadVouchersWidget() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    
     load(); 
     loadAnnouncements();
     loadVouchersWidget();  

@@ -6,8 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ announcement.title|default:"Announcement" }} - serbisyongScholar</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+    </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50">
     {% include 'partials/navbar.html' %}
     <div class="max-w-4xl mx-auto px-4 py-8">
         <div class="mb-6">

@@ -8,17 +8,24 @@
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <link rel="stylesheet" href="{% static 'css/progress.css' %}" />
+        <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            body {
+                font-family: 'Manrope', sans-serif;
+            }
+        </style>
     </head>
 
-    <body class="bg-gray-50">
+    <body class="bg-slate-50">
         {% include 'partials/navbar.html' %}
 
         <div class="max-w-7xl mx-auto px-4 py-8">
             <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900">
+                <h1 class="text-3xl font-bold text-slate-900">
                     Admin Dashboard
                 </h1>
-                <p class="text-gray-600">
+                <p class="text-slate-600">
                     Service Hour Overview • Academic Year 2025-2026
                 </p>
             </div>

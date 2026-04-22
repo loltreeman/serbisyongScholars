@@ -331,15 +331,25 @@ async function loadMyApplications() {
 function renderMyApplications(applications) {
     const container = document.getElementById('my-applications-container');
     if (applications.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 py-4 text-center">No applications found with this status.</p>';
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-200 rounded-xl">
+                <div class="bg-slate-50 p-4 rounded-full mb-4">
+                    <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                </div>
+                <p class="text-gray-500 font-semibold mb-1">No applications found</p>
+                <p class="text-gray-400 text-xs">Try changing the status filter or apply for a voucher above</p>
+            </div>
+        `;
         return;
     }
 
     const statusColors = {
-        'PENDING': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        'APPROVED': 'bg-green-100 text-green-800 border-green-200',
-        'REJECTED': 'bg-red-100 text-red-800 border-red-200',
-        'CLAIMED': 'bg-blue-100 text-blue-800 border-blue-200'
+        'PENDING': 'status-pending',
+        'APPROVED': 'status-active',
+        'REJECTED': 'status-rejected',
+        'CLAIMED': 'status-active'
     };
 
     container.innerHTML = `
@@ -349,7 +359,7 @@ function renderMyApplications(applications) {
                     <div class="mb-4">
                         <div class="flex justify-between items-start">
                             <h4 class="font-bold text-gray-900">${app.voucher_title}</h4>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${statusColors[app.status]}">${app.status}</span>
+                            <span class="status-badge ${statusColors[app.status]}">${app.status}</span>
                         </div>
                         <p class="text-xs text-gray-500 mt-1">Applied: ${new Date(app.applied_at).toLocaleDateString()}</p>
                     </div>
@@ -558,9 +568,9 @@ function renderVoucherSubmissions(subs) {
     }
 
     subs.forEach(v => {
-        let statusBadge = v.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                         v.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                         v.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800';
+        let statusBadgeClass = v.status === 'PENDING' ? 'status-pending' :
+                         v.status === 'ACTIVE' ? 'status-active' :
+                         v.status === 'REJECTED' ? 'status-rejected' : 'status-unassigned';
         
         let statusText = v.status === 'PENDING' ? 'Awaiting Approval' : v.status_display;
                          
@@ -572,7 +582,7 @@ function renderVoucherSubmissions(subs) {
             </td>
             <td class="px-4 py-3 text-gray-600 text-xs font-medium">${v.office_name || 'Unassigned'}</td>
             <td class="px-4 py-3">
-                <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold whitespace-nowrap ${statusBadge}">${statusText}</span>
+                <span class="status-badge ${statusBadgeClass}">${statusText}</span>
                 ${v.status === 'PENDING' ? `<div class="text-[10px] text-blue-600 mt-1 font-medium">⏱ Waiting for admin</div>` : ''}
                 ${v.rejection_reason ? `<div class="text-[10px] text-red-500 mt-1 italic">"${v.rejection_reason}"</div>` : ''}
             </td>
