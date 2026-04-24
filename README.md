@@ -22,7 +22,6 @@
 - [Screenshots](#screenshots)
 - [Tech Stack](#tech-stack)
 - [Installation](#installation)
-- [Environment Variables](#environment-variables)
 - [Running the Application](#running-the-application)
 - [API Documentation](#api-documentation)
 - [Usage Instructions](#how-to-use-serbisyongscholar)
@@ -47,12 +46,13 @@
 - **Moderators**: Participating offices (e.g., MVP Center, Rizal Library) that provide service opportunities
 - **Administrators**: Office of Admission and Aid (OAA) staff who oversee the entire scholar community
 
-### Why it exists:
+## Why SerbisyongScholar?
 Following the shutdown of the legacy service hour website during Intersession 2025–2026, scholars relied on a **public Google Spreadsheet** that exposed student IDs and service history to everyone. This created serious **data privacy concerns**. serbisyongScholar addresses this critical issue by providing:
 - **Data Privacy**: Secure, role-based access control
 - **Centralized Hub**: All information in one place
 - **Real-time Updates**: No more manual spreadsheet checking
 - **Mobile-Friendly**: Access anywhere, anytime
+- **Penalty Enforcement**: Automatic penalty calculation for scholars who fail to meet hour requirements, carried into the following semester
 
 ---
 
@@ -70,6 +70,7 @@ Following the shutdown of the legacy service hour website during Intersession 20
 - **Edit Entries**: Modify entries within a 7-day window
 - **Create Announcements**: Request announcements for volunteer opportunities
 - **View Encoding History**: Track all service hours encoded by your office
+- **Create Vouchers**: Submit voucher listings (food stubs, event tickets) for admin approval
 
 ### For Administrators 
 - **Admin Dashboard**: Overview of all scholars with completion statistics
@@ -78,18 +79,48 @@ Following the shutdown of the legacy service hour website during Intersession 20
 - **Announcement Approval**: Review and approve moderator-created announcements
 - **Penalty Tracking**: Apply penalties for incomplete service hours
 - **Audit Logs**: Track all system activities
+- **Voucher Management**: Approve or reject scholar voucher applications
+- **Semester Management**: Initialize semesters, set service hour deadlines, and process end-of-semester penalties
 
 ---
 
 ## Screenshots
 
-### Landing Page
+### Landing & Authentication
 ![Landing Page](screenshots/landing.png)
-*Professional landing page with feature highlights*
+*Landing page with feature highlights*
 
-### Scholar Dashboard
-![Scholar Dashboard](screenshots/dashboard.png)
+![Login](screenshots/login.png)
+*Login page*
+
+![Sign Up](screenshots/signup.png)
+*Scholar sign-up page*
+
+### Scholar Views
+![Scholar Dashboard](screenshots/scholar_dashboard.png)
 *Real-time service hour tracking with progress visualization*
+
+![Scholar Profile](screenshots/scholar_profile.png)
+*Scholar profile and service log history*
+
+![Scholar Vouchers](screenshots/scholar_vouchers.png)
+*Voucher browsing and application*
+
+### Admin Views
+![Admin Dashboard](screenshots/admin_dashboard.png)
+*Admin overview with scholar statistics and charts*
+
+![Admin Dashboard](screenshots/admin_dashboard2.png)
+*Admin scholar list with filters and search*
+
+![Audit Logs](screenshots/admin_audit_logs.png)
+*Audit logs with search and date filtering*
+
+![Announcements Management](screenshots/admin_announcements.png)
+*Announcement approval workflow*
+
+![Encode Hours](screenshots/admin_encode.png)
+*Service hour encoding with real-time scholar validation*
 
 ---
 
@@ -158,43 +189,6 @@ python manage.py migrate
 python manage.py createsuperuser
 # To create admin account, follow instructions from Django
 ```
-
----
-
-## Environment Variables
-
-The required environment variables are shown in the .env file:
-
-```env
-# Django Settings
-SECRET_KEY=your-secret-key-here
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Database (Production - PostgreSQL)
-DATABASE_URL=postgresql://user:password@localhost:5432/serbisyongscholar
-
-# Database (Development - SQLite)
-# Leave DATABASE_URL commented out to use SQLite
-
-# Email Settings (for email verification)
-EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_HOST_USER=your-email@gmail.com
-EMAIL_HOST_PASSWORD=your-app-password
-
-# CORS Settings
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-
-# JWT Settings
-JWT_SECRET_KEY=your-jwt-secret-key
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_LIFETIME_MINUTES=60
-REFRESH_TOKEN_LIFETIME_DAYS=7
-```
----
 
 ## Running the Application
 
@@ -400,33 +394,37 @@ Response: 200 OK
 ```
 serbisyongScholars/
 │
-├── scholarapp/                    # Our Django app for serbisyongScholar
-│   ├── migrations/
-│   ├── templates/
-│   │   ├── dashboard.html          
-│   │   └── index.html         
-│   │   ├── login.html          
-│   │   └── signup.html   
-│   │   └── verify.html         
-|
-|
-│   ├── models.py                  
-│   ├── views.py                   
-│   ├── serializers.py             
-│   ├── urls.py                    
-│   └── admin.py                   
-|
+├── scholarapp/                    # Main Django app
+│   └── migrations/
+│
 ├── serbisyongScholars/            # Django project settings
 │   ├── settings.py
 │   ├── urls.py
 │   └── wsgi.py
 │
-├── requirements.txt               
-├── manage.py                     
-├── db.sqlite3                     
-├── .env                          
+├── static/                        # Static source files
+│   ├── css/
+│   ├── img/
+│   └── js/
+│
+├── staticfiles/                   # Collected static files (auto-generated)
+│   └── rest_framework/
+│       ├── css/
+│       ├── docs/
+│       ├── fonts/
+│       ├── img/
+│       └── js/
+│
+├── templates/                     # HTML templates
+│
+├── screenshots/                   # README screenshots
+│
+├── db.sqlite3                     # Development database
+├── manage.py
+├── requirements.txt
 ├── .gitignore
-└── README.md                      # This file
+└── README.md
+
 ```
 
 ---
@@ -440,8 +438,8 @@ serbisyongScholars/
 | Name | Role | GitHub |
 |------|------|--------|
 | **Biason, Neil Aldous** | Full-Stack Engineer & Integration Lead | [@r1tsuuu](https://github.com/r1tsuuu) |
-| **Gines, Juan Paolo** | Backend Developer & Database Lead | [@vayporizer](https://github.com/vayporizer) |
-| **Malonzo, Rob Sebastian** | UI/UX Designer, QA Lead & Documentation | [@robmalonzo](https://github.com/robmalonzo) |
+| **Gines, Juan Paolo** | Backend Developer & Database Lead, Systems Documentation Officer | [@vayporizer](https://github.com/vayporizer) |
+| **Malonzo, Rob Sebastian** | UI/UX & Mobile Designer, QA Lead | [@robmalonzo](https://github.com/robmalonzo) |
 | **Naguio, Christian** | Frontend Developer & UI Lead | [@loltreeman](https://github.com/loltreeman) |
 | **Sabio, Jedale** | Backend Developer & Security Lead | [@studentidle](https://github.com/studentidle) |
 
@@ -450,7 +448,7 @@ serbisyongScholars/
 
 ---
 
-## 📄 License
+## License
 
 This project is developed as part of the **CSCI 42 - Software Engineering** course at Ateneo de Manila University.
 
@@ -466,39 +464,15 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-### Iteration 1 (Weeks 1-4) 
-- [x] Database setup with user authentication
-- [x] Scholar dashboard with service hour summary
-- [x] Email verification system
-- [x] Mobile-responsive design
-
-### Iteration 2 (Weeks 5-8) 
-- [ ] Service hour encoding system
-- [ ] Admin management dashboard
-- [ ] Moderator role assignment
-- [ ] Student lookup and search
-
-### Iteration 3 (Weeks 9-12) 
-- [ ] Announcement bulletin
-- [ ] Search and filter functionality
-- [ ] Charts and data visualization
-- [ ] Profile management
-
-### Iteration 4 (Weeks 13-16) 
-- [ ] Voucher sign-up system
-- [ ] Announcement approval workflow
-- [ ] Penalty tracking
-- [ ] Performance optimization
-- [ ] Production deployment
+All four iterations completed as of April 2026. 
 
 ---
 
 ## Additional Resources
 
 - [Django Documentation](https://docs.djangoproject.com/)
-- [React Documentation](https://react.dev/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 
 ---
