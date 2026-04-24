@@ -34,17 +34,16 @@ class User(AbstractUser):
         if self.role in ('ADMIN', 'MODERATOR'):
             return self.role
 
-        try:
-            self.moderator_profile  # type: ignore
+        if ModeratorProfile.objects.filter(user=self).exists():
             return 'MODERATOR'
-        except ObjectDoesNotExist:
-            return self.role
+        return self.role
 
     @property
     def assigned_office(self):
         try:
-            return self.moderator_profile.office_name  # type: ignore
-        except ObjectDoesNotExist:
+            mod_profile = ModeratorProfile.objects.get(user=self)
+            return mod_profile.office.name if mod_profile.office else mod_profile.office_name
+        except ModeratorProfile.DoesNotExist:
             return None
 
     def __str__(self):
@@ -81,6 +80,13 @@ class ScholarProfile(models.Model):
 
     def __str__(self):
         return f"{self.student_id} - {self.user.username}"
+    
+    def update_hours_from_logs(self):
+        """Update total_hours_rendered from service logs and recalculate carry over"""
+        from django.db.models import Sum
+        total = self.service_logs.aggregate(total=Sum('hours'))['total'] or 0.0
+        self.total_hours_rendered = total
+        self.save()
     
     def save(self, *args, **kwargs):
         
@@ -237,12 +243,33 @@ class Voucher(models.Model):
     def __str__(self):
         return f"{self.title} - {self.remaining_slots}/{self.total_slots} slots"
     
+    def is_available(self):
+        """Check if the voucher is available for application"""
+        from django.utils import timezone
+        today = timezone.now().date()
+        return (
+            self.status == 'ACTIVE' and
+            self.remaining_slots > 0 and
+            self.expiry_date >= today
+        )
+    
     class Meta:
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['office', 'status']),
             models.Index(fields=['created_by']),
         ]
+
+
+# Signals to update ScholarProfile hours when ServiceLogs change
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+
+@receiver(post_save, sender=ServiceLog)
+@receiver(post_delete, sender=ServiceLog)
+def update_scholar_hours(sender, instance, **kwargs):
+    """Update the scholar's total hours when service logs are added, updated, or deleted"""
+    instance.scholar.update_hours_from_logs()
     
     def is_available(self):
         """Check if voucher is still available"""
