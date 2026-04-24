@@ -1,0 +1,25 @@
+{
+  "name": "serbisyongscholars",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">\r   <img src=\"https://img.shields.io/badge/Django-4.2.7-green?logo=django\" alt=\"Django\">\r   <img src=\"https://img.shields.io/badge/PostgreSQL-Database-blue?logo=postgresql\" alt=\"PostgreSQL\">\r   <img src=\"https://img.shields.io/badge/TailwindCSS-Styling-06B6D4?logo=tailwindcss\" alt=\"TailwindCSS\">\r   <img src=\"https://img.shields.io/badge/License-MIT-yellow.svg\" alt=\"License\">\r </div>",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loltreeman/serbisyongScholars.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/loltreeman/serbisyongScholars/issues"
+  },
+  "homepage": "https://github.com/loltreeman/serbisyongScholars#readme",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.2.4",
+    "tailwindcss": "^4.2.4"
+  }
+}
