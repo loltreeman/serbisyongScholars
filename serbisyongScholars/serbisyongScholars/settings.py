@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-@=2j82f+qttjo*i66le@9(p*1v*em_t-+v*bo&+5@m(b_efky%
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1').split(',')
 
 AUTH_USER_MODEL = 'scholarapp.User'
 
