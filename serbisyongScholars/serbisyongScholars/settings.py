@@ -87,10 +87,13 @@ WSGI_APPLICATION = 'serbisyongScholars.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+database_url = os.environ.get('DATABASE_URL', '').replace('postgresql://', 'postgres://')
+
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
+        default=database_url,
         conn_max_age=600,
+        ssl_require=True,
     )
 }
 
